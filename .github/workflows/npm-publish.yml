@@ -1,4 +1,4 @@
-name: Publish [package-name] to npmjs
+name: Publish ts-lazy-container to npmjs
 
 on:
   push:

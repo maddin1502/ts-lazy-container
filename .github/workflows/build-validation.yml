@@ -1,4 +1,4 @@
-name: Validate [package-name] build
+name: Validate ts-lazy-container build
 
 on:
   pull_request:

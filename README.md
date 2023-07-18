@@ -1,24 +1,22 @@
-# [package-name]
+# ts-lazy-container
 > Template for node packages
 
-[![npm version](https://badge.fury.io/js/[package-name].svg)](https://badge.fury.io/js/[package-name])
+[![npm version](https://badge.fury.io/js/ts-lazy-container.svg)](https://badge.fury.io/js/ts-lazy-container)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![npm downloads](https://badgen.net/npm/dw/[package-name])](https://badge.fury.io/js/[package-name])
+[![npm downloads](https://badgen.net/npm/dw/ts-lazy-container)](https://badge.fury.io/js/ts-lazy-container)
 
 ## Features
-- a
-- b
-- c
+WIP
 
 ## Installation
 ```bash
-npm i [package-name]
+npm i ts-lazy-container
 ```
 or
 ```bash
-yarn add [package-name]
+yarn add ts-lazy-container
 ```
 
 ## Usage
-
+WIP
 ...

@@ -1,1 +1,5 @@
-export { Example } from './example.js';
+export {
+  LazyContainer,
+  type ConstructableParameters,
+  type InstanceInstruction
+} from './container.js';
