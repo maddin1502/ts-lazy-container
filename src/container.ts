@@ -39,6 +39,7 @@ type LazyContainerSource = {
 };
 
 export class LazyContainer extends Disposable {
+  private readonly _scopes: Map<string, LazyContainer>;
   private readonly _instanceSource: LazyContainerSource;
   private readonly _instructionSource: LazyContainerSource;
   private readonly _errorEventHandler: EventHandler<
@@ -62,17 +63,20 @@ export class LazyContainer extends Disposable {
 
   constructor() {
     super();
+    this._scopes = new Map();
     this._instanceSource = new Map();
     this._instructionSource = new Map();
     this._errorEventHandler = new EventHandler();
     this._resolvedEventHandler = new EventHandler();
     this._constructedEventHandler = new EventHandler();
     this._disposers.push(() => {
+      this._scopes.forEach((container) => container.dispose());
+      this._scopes.clear();
+      this._instanceSource.clear();
+      this._instructionSource.clear();
       this._errorEventHandler.dispose();
       this._resolvedEventHandler.dispose();
       this._constructedEventHandler.dispose();
-      this._instanceSource.clear();
-      this._instructionSource.clear();
     });
   }
 
@@ -84,6 +88,18 @@ export class LazyContainer extends Disposable {
   }
   public get onConstructed() {
     return this._constructedEventHandler.event;
+  }
+
+  public scope(scopeId: string): LazyContainer {
+    let scopedContainer = this._scopes.get(scopeId);
+
+    if (!scopedContainer) {
+      const container = new LazyContainer();
+      this._scopes.set(scopeId, container);
+      scopedContainer = container;
+    }
+
+    return scopedContainer;
   }
 
   public instruct<T>(

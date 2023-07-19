@@ -103,4 +103,35 @@ describe(LazyContainer.name, () => {
     expect(constructedCount).toBe(4);
     expect(errorCount).toBe(2);
   });
+
+  it('scopes', () => {
+    expect.assertions(10);
+    const container = new LazyContainer();
+    let errorCount = 0;
+    let resolvedCount = 0;
+    let constructedCount = 0;
+    container.onError.subscribe('error', () => errorCount++);
+    container.onResolved.subscribe('resolved', () => resolvedCount++);
+    container.onConstructed.subscribe('constructed', () => constructedCount++);
+
+    container.provide(B);
+    container.provide(WithSimpleParam, B, 42);
+    expect(container.resolve(WithSimpleParam).value).toBe(42);
+    expect(() => container.scope('1').resolve(WithSimpleParam));
+    container.scope('1').provide(B);
+    expect(() => container.scope('1').resolve(WithSimpleParam));
+    container.scope('1').provide(WithSimpleParam, B, 4242);
+    expect(container.resolve(WithSimpleParam).value).toBe(42);
+    expect(container.scope('1').resolve(WithSimpleParam).value).toBe(4242);
+
+    expect(() => container.scope('1').scope('1').resolve(WithSimpleParam));
+    container.scope('1').scope('1').provide(B);
+    expect(() => container.scope('1').scope('1').resolve(WithSimpleParam));
+    container.scope('1').scope('1').provide(WithSimpleParam, B, 424242);
+    expect(container.resolve(WithSimpleParam).value).toBe(42);
+    expect(container.scope('1').resolve(WithSimpleParam).value).toBe(4242);
+    expect(container.scope('1').scope('1').resolve(WithSimpleParam).value).toBe(
+      424242
+    );
+  });
 });
