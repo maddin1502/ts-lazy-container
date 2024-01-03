@@ -12,7 +12,14 @@ export type ConstructableParameters<
   C extends StandardConstructor,
   CP extends ConstructorParameters<C> = ConstructorParameters<C>
 > = {
-  [K in keyof CP]: CP[K] extends object ? StandardConstructor<CP[K]> : CP[K];
+  [K in keyof CP]:
+  CP[K] extends Function
+  ? CP[K]
+  : CP[K] extends Array<any>
+  ? CP[K]
+  : CP[K] extends object
+  ? StandardConstructor<CP[K]>
+  : CP[K];
 } extends [...infer P]
   ? P
   : never;
@@ -189,7 +196,7 @@ export class LazyContainer extends Disposable {
     // TODO: optimize type assertions
     return parameters_.map((parameter_) =>
       typeof parameter_ === 'function' &&
-      parameter_.toString().startsWith('class')
+        parameter_.toString().startsWith('class')
         ? this.resolve(parameter_ as StandardConstructor<unknown>)
         : parameter_
     ) as ConstructorParameters<C>;
@@ -208,7 +215,7 @@ export class LazyContainer extends Disposable {
       return;
     }
 
-    this._instructionSource.forEach(({}, constructor_) => {
+    this._instructionSource.forEach(({ }, constructor_) => {
       this.resolve(constructor_);
     });
   }

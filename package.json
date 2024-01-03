@@ -1,6 +1,6 @@
 {
   "name": "ts-lazy-container",
-  "version": "0.0.3-beta",
+  "version": "0.0.4-beta",
   "description": "Tool for lazy dependency injection",
   "files": [
     "dist"

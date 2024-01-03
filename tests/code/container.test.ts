@@ -6,7 +6,7 @@ class A {
 }
 
 class DependsOnA {
-  constructor(private _a: A) {}
+  constructor(private _a: A) { }
 
   public get a() {
     return this._a;
@@ -17,8 +17,13 @@ class B {
   otherthing: number | undefined;
 }
 
-class WithSimpleParam {
-  constructor(private _b: B, public readonly value: number) {}
+class WithSimpleParams {
+  constructor(
+    private _b: B,
+    public readonly valueParam: number,
+    public readonly arrayParam: number[],
+    public readonly functionParam: () => number
+  ) { }
 
   public get b() {
     return this._b;
@@ -59,11 +64,11 @@ describe(LazyContainer.name, () => {
     expect(resolvedCount).toBe(5);
     expect(constructedCount).toBe(2);
     expect(errorCount).toBe(3);
-    container.provide(WithSimpleParam, B, 42);
-    expect(() => container.resolve(WithSimpleParam)).toThrow();
+    container.provide(WithSimpleParams, B, 42, [42, 42], () => 84);
+    expect(() => container.resolve(WithSimpleParams)).toThrow();
     expect(errorCount).toBe(4);
     container.provide(B);
-    expect(container.resolve(WithSimpleParam).value).toBe(42);
+    expect(container.resolve(WithSimpleParams).valueParam).toBe(42);
     expect(resolvedCount).toBe(7);
     expect(constructedCount).toBe(4);
   });
@@ -92,7 +97,7 @@ describe(LazyContainer.name, () => {
     expect(resolvedCount).toBe(2);
     expect(constructedCount).toBe(2);
     expect(errorCount).toBe(1);
-    container.provide(WithSimpleParam, B, 42);
+    container.provide(WithSimpleParams, B, 42, [42, 42], () => 84);
     expect(() => container.presolve()).toThrow();
     expect(resolvedCount).toBe(2);
     expect(constructedCount).toBe(2);
@@ -105,7 +110,7 @@ describe(LazyContainer.name, () => {
   });
 
   it('scopes', () => {
-    expect.assertions(10);
+    expect.assertions(22);
     const container = new LazyContainer();
     let errorCount = 0;
     let resolvedCount = 0;
@@ -115,23 +120,35 @@ describe(LazyContainer.name, () => {
     container.onConstructed.subscribe('constructed', () => constructedCount++);
 
     container.provide(B);
-    container.provide(WithSimpleParam, B, 42);
-    expect(container.resolve(WithSimpleParam).value).toBe(42);
-    expect(() => container.scope('1').resolve(WithSimpleParam));
+    container.provide(WithSimpleParams, B, 42, [42, 42], () => 84);
+    expect(container.resolve(WithSimpleParams).valueParam).toBe(42);
+    expect(container.resolve(WithSimpleParams).arrayParam).toEqual([42, 42]);
+    expect(container.resolve(WithSimpleParams).functionParam()).toBe(84);
+    expect(() => container.scope('1').resolve(WithSimpleParams));
     container.scope('1').provide(B);
-    expect(() => container.scope('1').resolve(WithSimpleParam));
-    container.scope('1').provide(WithSimpleParam, B, 4242);
-    expect(container.resolve(WithSimpleParam).value).toBe(42);
-    expect(container.scope('1').resolve(WithSimpleParam).value).toBe(4242);
+    expect(() => container.scope('1').resolve(WithSimpleParams));
+    container.scope('1').provide(WithSimpleParams, B, 4242, [4242, 4242], () => 8484);
+    expect(container.resolve(WithSimpleParams).valueParam).toBe(42);
+    expect(container.resolve(WithSimpleParams).arrayParam).toEqual([42, 42]);
+    expect(container.resolve(WithSimpleParams).functionParam()).toBe(84);
+    expect(container.scope('1').resolve(WithSimpleParams).valueParam).toBe(4242);
+    expect(container.scope('1').resolve(WithSimpleParams).arrayParam).toEqual([4242, 4242]);
+    expect(container.scope('1').resolve(WithSimpleParams).functionParam()).toBe(8484);
 
-    expect(() => container.scope('1').scope('1').resolve(WithSimpleParam));
+    expect(() => container.scope('1').scope('1').resolve(WithSimpleParams));
     container.scope('1').scope('1').provide(B);
-    expect(() => container.scope('1').scope('1').resolve(WithSimpleParam));
-    container.scope('1').scope('1').provide(WithSimpleParam, B, 424242);
-    expect(container.resolve(WithSimpleParam).value).toBe(42);
-    expect(container.scope('1').resolve(WithSimpleParam).value).toBe(4242);
-    expect(container.scope('1').scope('1').resolve(WithSimpleParam).value).toBe(
+    expect(() => container.scope('1').scope('1').resolve(WithSimpleParams));
+    container.scope('1').scope('1').provide(WithSimpleParams, B, 424242, [424242, 424242], () => 848484);
+    expect(container.resolve(WithSimpleParams).valueParam).toBe(42);
+    expect(container.resolve(WithSimpleParams).arrayParam).toEqual([42, 42]);
+    expect(container.resolve(WithSimpleParams).functionParam()).toBe(84);
+    expect(container.scope('1').resolve(WithSimpleParams).valueParam).toBe(4242);
+    expect(container.scope('1').resolve(WithSimpleParams).arrayParam).toEqual([4242, 4242]);
+    expect(container.scope('1').resolve(WithSimpleParams).functionParam()).toBe(8484);
+    expect(container.scope('1').scope('1').resolve(WithSimpleParams).valueParam).toBe(
       424242
     );
+    expect(container.scope('1').scope('1').resolve(WithSimpleParams).arrayParam).toEqual([424242, 424242]);
+    expect(container.scope('1').scope('1').resolve(WithSimpleParams).functionParam()).toBe(848484);
   });
 });
