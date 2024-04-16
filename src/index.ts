@@ -1,5 +1,2 @@
-export {
-  LazyContainer,
-  type ConstructableParameters,
-  type InstanceInstruction
-} from './container.js';
+export { LazyContainer } from './container.js';
+export type * from './types.js';
