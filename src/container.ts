@@ -5,9 +5,19 @@ import {
   type ConstructorParameters,
   type StandardConstructor
 } from 'ts-lib-extended';
-import type { ConstructableParameters, ErrorKind, InstanceInstruction } from './types.js';
+import type {
+  ConstructableParameters,
+  ErrorKind,
+  InstanceInstruction
+} from './types.js';
 
-type LazyContainerSource = {
+type ResolveFromScope = <T>(
+  constructor_: StandardConstructor<T>
+) => InstanceInstruction<T> | undefined;
+
+type ScopeSource = Map<string, LazyContainer>;
+
+type ContainerSource = {
   has<T>(constructor_: StandardConstructor<T>): boolean;
   delete<C extends StandardConstructor>(constructor_: C): boolean;
   get<T>(
@@ -16,7 +26,7 @@ type LazyContainerSource = {
   set<T>(
     constructor_: StandardConstructor<T>,
     instruction_: InstanceInstruction<T>
-  ): LazyContainerSource;
+  ): ContainerSource;
   size: number;
   forEach(
     callbackfn: (
@@ -29,9 +39,14 @@ type LazyContainerSource = {
 };
 
 export class LazyContainer extends Disposable {
-  private readonly _scopes: Map<string, LazyContainer>;
-  private readonly _instanceSource: LazyContainerSource;
-  private readonly _instructionSource: LazyContainerSource;
+  public static Create(): LazyContainer {
+    return new LazyContainer();
+  }
+
+  private readonly _isolatedScopes: ScopeSource;
+  private readonly _inheritedScopes: ScopeSource;
+  private readonly _instanceSource: ContainerSource;
+  private readonly _instructionSource: ContainerSource;
   private readonly _errorEventHandler: EventHandler<
     this,
     EventArgs<{
@@ -51,17 +66,20 @@ export class LazyContainer extends Disposable {
     }>
   >;
 
-  constructor() {
+  private constructor(private readonly _resolveFromScope?: ResolveFromScope) {
     super();
-    this._scopes = new Map();
+    this._isolatedScopes = new Map();
+    this._inheritedScopes = new Map();
     this._instanceSource = new Map();
     this._instructionSource = new Map();
     this._errorEventHandler = new EventHandler();
     this._resolvedEventHandler = new EventHandler();
     this._constructedEventHandler = new EventHandler();
     this._disposers.push(() => {
-      this._scopes.forEach((container) => container.dispose());
-      this._scopes.clear();
+      this._isolatedScopes.forEach((container) => container.dispose());
+      this._isolatedScopes.clear();
+      this._inheritedScopes.forEach((container) => container.dispose());
+      this._inheritedScopes.clear();
       this._instanceSource.clear();
       this._instructionSource.clear();
       this._errorEventHandler.dispose();
@@ -80,13 +98,26 @@ export class LazyContainer extends Disposable {
     return this._constructedEventHandler.event;
   }
 
-  public scope(scopeId: string): LazyContainer {
-    let scopedContainer = this._scopes.get(scopeId);
+  public isolatedScope(scopeId_: string): LazyContainer {
+    return this.scope(this._isolatedScopes, scopeId_);
+  }
+
+  public inheritedScope(scopeId_: string): LazyContainer {
+    return this.scope(this._inheritedScopes, scopeId_, (constructor_) =>
+      this.getInstanceResolver(constructor_)
+    );
+  }
+
+  private scope(
+    source_: ScopeSource,
+    scopeId_: string,
+    resolveFromScope_?: ResolveFromScope
+  ): LazyContainer {
+    let scopedContainer = source_.get(scopeId_);
 
     if (!scopedContainer) {
-      const container = new LazyContainer();
-      this._scopes.set(scopeId, container);
-      scopedContainer = container;
+      scopedContainer = new LazyContainer(resolveFromScope_);
+      source_.set(scopeId_, scopedContainer);
     }
 
     return scopedContainer;
@@ -152,7 +183,8 @@ export class LazyContainer extends Disposable {
   ): InstanceInstruction<T> | undefined {
     return (
       this._instanceSource.get(constructor_) ??
-      this.resolveInstruction(constructor_)
+      this.resolveInstruction(constructor_) ??
+      this._resolveFromScope?.(constructor_)
     );
   }
 
@@ -217,6 +249,6 @@ export class LazyContainer extends Disposable {
       })
     );
 
-    throw new Error(`[lazy-container/${origin_}]: ${message_}`);
+    throw new Error(`[ts-lazy-container/${origin_}]: ${message_}`);
   }
 }

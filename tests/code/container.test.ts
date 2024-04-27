@@ -37,7 +37,7 @@ class NotProvided {
 describe(LazyContainer, () => {
   it('injection', () => {
     expect.assertions(20);
-    const container = new LazyContainer();
+    const container = LazyContainer.Create();
     let errorCount = 0;
     let resolvedCount = 0;
     let constructedCount = 0;
@@ -75,7 +75,7 @@ describe(LazyContainer, () => {
 
   it('presolve', () => {
     expect.assertions(17);
-    const container = new LazyContainer();
+    const container = LazyContainer.Create();
     let errorCount = 0;
     let resolvedCount = 0;
     let constructedCount = 0;
@@ -111,7 +111,7 @@ describe(LazyContainer, () => {
 
   it('scopes', () => {
     expect.assertions(22);
-    const container = new LazyContainer();
+    const container = LazyContainer.Create();
     let errorCount = 0;
     let resolvedCount = 0;
     let constructedCount = 0;
@@ -124,52 +124,62 @@ describe(LazyContainer, () => {
     expect(container.resolve(WithSimpleParams).valueParam).toBe(42);
     expect(container.resolve(WithSimpleParams).arrayParam).toEqual([42, 42]);
     expect(container.resolve(WithSimpleParams).functionParam()).toBe(84);
-    expect(() => container.scope('1').resolve(WithSimpleParams));
-    container.scope('1').provide(B);
-    expect(() => container.scope('1').resolve(WithSimpleParams));
+    expect(() => container.isolatedScope('1').resolve(WithSimpleParams));
+    container.isolatedScope('1').provide(B);
+    expect(() => container.isolatedScope('1').resolve(WithSimpleParams));
     container
-      .scope('1')
+      .isolatedScope('1')
       .provide(WithSimpleParams, B, 4242, [4242, 4242], () => 8484);
     expect(container.resolve(WithSimpleParams).valueParam).toBe(42);
     expect(container.resolve(WithSimpleParams).arrayParam).toEqual([42, 42]);
     expect(container.resolve(WithSimpleParams).functionParam()).toBe(84);
-    expect(container.scope('1').resolve(WithSimpleParams).valueParam).toBe(
-      4242
-    );
-    expect(container.scope('1').resolve(WithSimpleParams).arrayParam).toEqual([
-      4242, 4242
-    ]);
-    expect(container.scope('1').resolve(WithSimpleParams).functionParam()).toBe(
-      8484
-    );
+    expect(
+      container.isolatedScope('1').resolve(WithSimpleParams).valueParam
+    ).toBe(4242);
+    expect(
+      container.isolatedScope('1').resolve(WithSimpleParams).arrayParam
+    ).toEqual([4242, 4242]);
+    expect(
+      container.isolatedScope('1').resolve(WithSimpleParams).functionParam()
+    ).toBe(8484);
 
-    expect(() => container.scope('1').scope('1').resolve(WithSimpleParams));
-    container.scope('1').scope('1').provide(B);
-    expect(() => container.scope('1').scope('1').resolve(WithSimpleParams));
+    expect(() =>
+      container.isolatedScope('1').isolatedScope('1').resolve(WithSimpleParams)
+    );
+    container.isolatedScope('1').isolatedScope('1').provide(B);
+    expect(() =>
+      container.isolatedScope('1').isolatedScope('1').resolve(WithSimpleParams)
+    );
     container
-      .scope('1')
-      .scope('1')
+      .isolatedScope('1')
+      .isolatedScope('1')
       .provide(WithSimpleParams, B, 424242, [424242, 424242], () => 848484);
     expect(container.resolve(WithSimpleParams).valueParam).toBe(42);
     expect(container.resolve(WithSimpleParams).arrayParam).toEqual([42, 42]);
     expect(container.resolve(WithSimpleParams).functionParam()).toBe(84);
-    expect(container.scope('1').resolve(WithSimpleParams).valueParam).toBe(
-      4242
-    );
-    expect(container.scope('1').resolve(WithSimpleParams).arrayParam).toEqual([
-      4242, 4242
-    ]);
-    expect(container.scope('1').resolve(WithSimpleParams).functionParam()).toBe(
-      8484
-    );
     expect(
-      container.scope('1').scope('1').resolve(WithSimpleParams).valueParam
+      container.isolatedScope('1').resolve(WithSimpleParams).valueParam
+    ).toBe(4242);
+    expect(
+      container.isolatedScope('1').resolve(WithSimpleParams).arrayParam
+    ).toEqual([4242, 4242]);
+    expect(
+      container.isolatedScope('1').resolve(WithSimpleParams).functionParam()
+    ).toBe(8484);
+    expect(
+      container.isolatedScope('1').isolatedScope('1').resolve(WithSimpleParams)
+        .valueParam
     ).toBe(424242);
     expect(
-      container.scope('1').scope('1').resolve(WithSimpleParams).arrayParam
+      container.isolatedScope('1').isolatedScope('1').resolve(WithSimpleParams)
+        .arrayParam
     ).toEqual([424242, 424242]);
     expect(
-      container.scope('1').scope('1').resolve(WithSimpleParams).functionParam()
+      container
+        .isolatedScope('1')
+        .isolatedScope('1')
+        .resolve(WithSimpleParams)
+        .functionParam()
     ).toBe(848484);
   });
 });
