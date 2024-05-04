@@ -8,16 +8,37 @@ import {
 import type {
   ConstructableParameters,
   ErrorKind,
-  InstanceInstruction
+  InstanceInstruction,
+  ResolveMode
 } from './types.js';
 
+type InstanceResolver<T> = () => T;
 type ResolveFromScope = <T>(
-  constructor_: StandardConstructor<T>
-) => InstanceInstruction<T> | undefined;
+  constructor_: StandardConstructor<T>,
+  mode_: ResolveMode
+) => InstanceResolver<T> | undefined;
 
 type ScopeSource = Map<string, LazyContainer>;
 
-type ContainerSource = {
+type InstanceSource = {
+  has<T>(constructor_: StandardConstructor<T>): boolean;
+  delete<C extends StandardConstructor>(constructor_: C): boolean;
+  get<T>(constructor_: StandardConstructor<T>): InstanceResolver<T> | undefined;
+  set<T>(
+    constructor_: StandardConstructor<T>,
+    instruction_: InstanceResolver<T>
+  ): InstanceSource;
+  size: number;
+  forEach(
+    callbackfn: (
+      value_: InstanceResolver<InstanceType<StandardConstructor>>,
+      key_: StandardConstructor
+    ) => void,
+    thisArg?: any
+  ): void;
+  clear(): void;
+};
+type InstructionSource = {
   has<T>(constructor_: StandardConstructor<T>): boolean;
   delete<C extends StandardConstructor>(constructor_: C): boolean;
   get<T>(
@@ -26,7 +47,7 @@ type ContainerSource = {
   set<T>(
     constructor_: StandardConstructor<T>,
     instruction_: InstanceInstruction<T>
-  ): ContainerSource;
+  ): InstructionSource;
   size: number;
   forEach(
     callbackfn: (
@@ -45,8 +66,8 @@ export class LazyContainer extends Disposable {
 
   private readonly _isolatedScopes: ScopeSource;
   private readonly _inheritedScopes: ScopeSource;
-  private readonly _instanceSource: ContainerSource;
-  private readonly _instructionSource: ContainerSource;
+  private readonly _singletonSource: InstanceSource;
+  private readonly _instructionSource: InstructionSource;
   private readonly _errorEventHandler: EventHandler<
     this,
     EventArgs<{
@@ -70,7 +91,7 @@ export class LazyContainer extends Disposable {
     super();
     this._isolatedScopes = new Map();
     this._inheritedScopes = new Map();
-    this._instanceSource = new Map();
+    this._singletonSource = new Map();
     this._instructionSource = new Map();
     this._errorEventHandler = new EventHandler();
     this._resolvedEventHandler = new EventHandler();
@@ -80,7 +101,7 @@ export class LazyContainer extends Disposable {
       this._isolatedScopes.clear();
       this._inheritedScopes.forEach((container) => container.dispose());
       this._inheritedScopes.clear();
-      this._instanceSource.clear();
+      this._singletonSource.clear();
       this._instructionSource.clear();
       this._errorEventHandler.dispose();
       this._resolvedEventHandler.dispose();
@@ -103,8 +124,8 @@ export class LazyContainer extends Disposable {
   }
 
   public inheritedScope(scopeId_: string): LazyContainer {
-    return this.scope(this._inheritedScopes, scopeId_, (constructor_) =>
-      this.getInstanceResolver(constructor_)
+    return this.scope(this._inheritedScopes, scopeId_, (constructor_, mode_) =>
+      this.getInstanceResolver(constructor_, mode_)
     );
   }
 
@@ -140,13 +161,17 @@ export class LazyContainer extends Disposable {
     this.validateKnown(constructor_);
     this.instruct(
       constructor_,
-      () => new constructor_(...this.resolveParameters(parameters_))
+      (mode_) => new constructor_(...this.resolveParameters(parameters_, mode_))
     );
   }
 
-  public resolve<T>(constructor_: StandardConstructor<T>): T | never {
+  public resolve<T>(
+    constructor_: StandardConstructor<T>,
+    mode_: ResolveMode = 'singleton'
+  ): T | never {
     this.validateDisposed(this);
-    const instanceResolver = this.getInstanceResolver<T>(constructor_);
+    console.log('resolve', constructor_.name, mode_);
+    const instanceResolver = this.getInstanceResolver<T>(constructor_, mode_);
 
     if (instanceResolver) {
       const instance = instanceResolver();
@@ -166,7 +191,7 @@ export class LazyContainer extends Disposable {
     constructor_: C
   ): void | never {
     if (
-      this._instanceSource.has<C>(constructor_) ||
+      this._singletonSource.has<C>(constructor_) ||
       this._instructionSource.has<C>(constructor_)
     ) {
       this.throwError(
@@ -179,46 +204,70 @@ export class LazyContainer extends Disposable {
   }
 
   private getInstanceResolver<T>(
-    constructor_: StandardConstructor<T>
-  ): InstanceInstruction<T> | undefined {
-    return (
-      this._instanceSource.get(constructor_) ??
-      this.resolveInstruction(constructor_) ??
-      this._resolveFromScope?.(constructor_)
-    );
+    constructor_: StandardConstructor<T>,
+    mode_: ResolveMode
+  ): InstanceResolver<T> | undefined {
+    switch (mode_) {
+      case 'singleton':
+        return (
+          this._singletonSource.get(constructor_) ??
+          this.resolveInstruction(constructor_, mode_) ??
+          this._resolveFromScope?.(constructor_, mode_)
+        );
+      case 'unique':
+        return (
+          this.resolveInstruction(constructor_, 'singleton') ??
+          this._resolveFromScope?.(constructor_, 'singleton')
+        );
+      case 'deep-unique':
+        return (
+          this.resolveInstruction(constructor_, mode_) ??
+          this._resolveFromScope?.(constructor_, mode_)
+        );
+    }
   }
 
   private resolveInstruction<T>(
-    constructor_: StandardConstructor<T>
-  ): InstanceInstruction<T> | undefined {
+    constructor_: StandardConstructor<T>,
+    mode_: ResolveMode
+  ): InstanceResolver<T> | undefined {
     const instruction = this._instructionSource.get(constructor_);
 
     if (instruction) {
-      const instance = instruction();
+      const instance = instruction(mode_);
       this._constructedEventHandler.invoke(
         this,
         new EventArgs({ constructor: constructor_, instance: instance })
       );
-      this._instanceSource.set<T>(constructor_, () => instance);
-      this._instructionSource.delete(constructor_);
-      return () => instance;
+
+      const instanceResolver: InstanceResolver<T> = () => instance;
+
+      if (mode_ === 'singleton') {
+        this._singletonSource.set<T>(constructor_, instanceResolver);
+      }
+
+      return instanceResolver;
     }
   }
 
   private resolveParameters<T, C extends StandardConstructor<T>>(
-    parameters_: ConstructableParameters<C>
+    parameters_: ConstructableParameters<C>,
+    mode_: ResolveMode
   ): ConstructorParameters<C> {
     // TODO: optimize type assertions
     return parameters_.map((parameter_) =>
       typeof parameter_ === 'function' &&
       parameter_.toString().startsWith('class')
-        ? this.resolve(parameter_ as StandardConstructor<unknown>)
+        ? this.resolve(
+            parameter_ as StandardConstructor<unknown>,
+            mode_ === 'unique' ? 'singleton' : mode_
+          )
         : parameter_
     ) as ConstructorParameters<C>;
   }
 
   /**
-   * pre resolve all instances (renounce laziness). HINT: can be used to validate container consistency
+   * pre resolve instances as singleton and abandon laziness (including scopes). HINT: can be used to validate container consistency
    *
    * @memberof LazyContainer
    * @throws {Error}
@@ -226,12 +275,16 @@ export class LazyContainer extends Disposable {
   public presolve(): void | never {
     this.validateDisposed(this);
 
-    if (this._instructionSource.size === 0) {
-      return;
-    }
-
     this._instructionSource.forEach(({}, constructor_) => {
-      this.resolve(constructor_);
+      this.resolve(constructor_, 'singleton');
+    });
+
+    this._inheritedScopes.forEach((inheritedScope_) => {
+      inheritedScope_.presolve();
+    });
+
+    this._isolatedScopes.forEach((isolatedScope_) => {
+      isolatedScope_.presolve();
     });
   }
 
