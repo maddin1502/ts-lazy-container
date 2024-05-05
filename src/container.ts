@@ -5,11 +5,12 @@ import {
   type ConstructorParameters,
   type StandardConstructor
 } from 'ts-lib-extended';
-import type {
-  ConstructableParameters,
-  ErrorKind,
-  InstanceInstruction,
-  ResolveMode
+import {
+  InstanceEventArgs,
+  type ConstructableParameters,
+  type ErrorKind,
+  type InstanceInstruction,
+  type ResolveMode
 } from './types.js';
 
 type InstanceResolver<T> = () => T;
@@ -22,17 +23,15 @@ type ScopeSource = Map<string, LazyContainer>;
 
 type InstanceSource = {
   has<T>(constructor_: StandardConstructor<T>): boolean;
-  delete<C extends StandardConstructor>(constructor_: C): boolean;
   get<T>(constructor_: StandardConstructor<T>): InstanceResolver<T> | undefined;
   set<T>(
     constructor_: StandardConstructor<T>,
-    instruction_: InstanceResolver<T>
+    resolver_: InstanceResolver<T>
   ): InstanceSource;
-  size: number;
   forEach(
-    callbackfn: (
-      value_: InstanceResolver<InstanceType<StandardConstructor>>,
-      key_: StandardConstructor
+    callbackfn: <T, C extends StandardConstructor<T>>(
+      value_: InstanceResolver<T>,
+      key_: C
     ) => void,
     thisArg?: any
   ): void;
@@ -40,7 +39,6 @@ type InstanceSource = {
 };
 type InstructionSource = {
   has<T>(constructor_: StandardConstructor<T>): boolean;
-  delete<C extends StandardConstructor>(constructor_: C): boolean;
   get<T>(
     constructor_: StandardConstructor<T>
   ): InstanceInstruction<T> | undefined;
@@ -48,11 +46,10 @@ type InstructionSource = {
     constructor_: StandardConstructor<T>,
     instruction_: InstanceInstruction<T>
   ): InstructionSource;
-  size: number;
   forEach(
-    callbackfn: (
-      value_: InstanceInstruction<InstanceType<StandardConstructor>>,
-      key_: StandardConstructor
+    callbackfn: <T, C extends StandardConstructor<T>>(
+      value_: InstanceInstruction<T>,
+      key_: C
     ) => void,
     thisArg?: any
   ): void;
@@ -77,14 +74,11 @@ export class LazyContainer extends Disposable {
   >;
   private readonly _resolvedEventHandler: EventHandler<
     this,
-    EventArgs<StandardConstructor>
+    InstanceEventArgs<unknown>
   >;
   private readonly _constructedEventHandler: EventHandler<
     this,
-    EventArgs<{
-      constructor: StandardConstructor;
-      instance: unknown;
-    }>
+    InstanceEventArgs<unknown>
   >;
 
   private constructor(private readonly _resolveFromScope?: ResolveFromScope) {
@@ -170,12 +164,14 @@ export class LazyContainer extends Disposable {
     mode_: ResolveMode = 'singleton'
   ): T | never {
     this.validateDisposed(this);
-    console.log('resolve', constructor_.name, mode_);
     const instanceResolver = this.getInstanceResolver<T>(constructor_, mode_);
 
     if (instanceResolver) {
       const instance = instanceResolver();
-      this._resolvedEventHandler.invoke(this, new EventArgs(constructor_));
+      this._resolvedEventHandler.invoke(
+        this,
+        new InstanceEventArgs({ constructor: constructor_, instance: instance })
+      );
       return instance;
     }
 
@@ -190,10 +186,7 @@ export class LazyContainer extends Disposable {
   private validateKnown<C extends StandardConstructor>(
     constructor_: C
   ): void | never {
-    if (
-      this._singletonSource.has<C>(constructor_) ||
-      this._instructionSource.has<C>(constructor_)
-    ) {
+    if (this._instructionSource.has<C>(constructor_)) {
       this.throwError(
         constructor_,
         this.validateKnown.name,
@@ -237,7 +230,7 @@ export class LazyContainer extends Disposable {
       const instance = instruction(mode_);
       this._constructedEventHandler.invoke(
         this,
-        new EventArgs({ constructor: constructor_, instance: instance })
+        new InstanceEventArgs({ constructor: constructor_, instance: instance })
       );
 
       const instanceResolver: InstanceResolver<T> = () => instance;

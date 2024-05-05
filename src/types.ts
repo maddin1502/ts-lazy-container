@@ -1,4 +1,8 @@
-import type { MethodLike, StandardConstructor } from 'ts-lib-extended';
+import {
+  EventArgs,
+  type MethodLike,
+  type StandardConstructor
+} from 'ts-lib-extended';
 
 export type ResolveMode = 'singleton' | 'unique' | 'deep-unique';
 export type ErrorKind = 'duplicate' | 'missing';
@@ -17,3 +21,8 @@ export type ConstructableParameters<
 } extends [...infer P]
   ? P
   : never;
+
+export class InstanceEventArgs<T> extends EventArgs<{
+  constructor: StandardConstructor<T>;
+  instance: T;
+}> {}
