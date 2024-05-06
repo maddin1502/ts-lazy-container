@@ -36,6 +36,7 @@ type InstanceSource = {
     thisArg?: any
   ): void;
   clear(): void;
+  delete<T>(constructor_: StandardConstructor<T>): boolean;
 };
 type InstructionSource = {
   has<T>(constructor_: StandardConstructor<T>): boolean;
@@ -54,6 +55,7 @@ type InstructionSource = {
     thisArg?: any
   ): void;
   clear(): void;
+  delete<T>(constructor_: StandardConstructor<T>): boolean;
 };
 
 export class LazyContainer extends Disposable {
@@ -181,6 +183,10 @@ export class LazyContainer extends Disposable {
       `"${constructor_.name}" could not be resolved`,
       'missing'
     );
+  }
+
+  public flush<C extends StandardConstructor>(constructor_: C): boolean {
+    return this._singletonSource.delete(constructor_);
   }
 
   private validateKnown<C extends StandardConstructor>(
