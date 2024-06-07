@@ -9,53 +9,53 @@ import {
   InstanceEventArgs,
   type ConstructableParameters,
   type ErrorKind,
+  type Identifier,
+  type InjectionKey,
   type InstanceInstruction,
   type ResolveMode
 } from './types.js';
 
 type InstanceResolver<T> = () => T;
 type ResolveFromScope = <T>(
-  constructor_: StandardConstructor<T>,
+  identifier_: Identifier<T>,
   mode_: ResolveMode
 ) => InstanceResolver<T> | undefined;
 
 type ScopeSource = Map<string, LazyContainer>;
 
 type InstanceSource = {
-  has<T>(constructor_: StandardConstructor<T>): boolean;
-  get<T>(constructor_: StandardConstructor<T>): InstanceResolver<T> | undefined;
+  has<T>(identifier_: Identifier<T>): boolean;
+  get<T>(identifier_: Identifier<T>): InstanceResolver<T> | undefined;
   set<T>(
-    constructor_: StandardConstructor<T>,
+    identifier_: Identifier<T>,
     resolver_: InstanceResolver<T>
   ): InstanceSource;
   forEach(
-    callbackfn: <T, C extends StandardConstructor<T>>(
+    callbackfn: <T, ID extends Identifier<T>>(
       value_: InstanceResolver<T>,
-      key_: C
+      key_: ID
     ) => void,
     thisArg?: any
   ): void;
   clear(): void;
-  delete<T>(constructor_: StandardConstructor<T>): boolean;
+  delete<T>(identifier_: Identifier<T>): boolean;
 };
 type InstructionSource = {
-  has<T>(constructor_: StandardConstructor<T>): boolean;
-  get<T>(
-    constructor_: StandardConstructor<T>
-  ): InstanceInstruction<T> | undefined;
+  has<T>(identifier_: Identifier<T>): boolean;
+  get<T>(identifier_: Identifier<T>): InstanceInstruction<T> | undefined;
   set<T>(
-    constructor_: StandardConstructor<T>,
+    identifier_: Identifier<T>,
     instruction_: InstanceInstruction<T>
   ): InstructionSource;
   forEach(
-    callbackfn: <T, C extends StandardConstructor<T>>(
+    callbackfn: <T, ID extends Identifier<T>>(
       value_: InstanceInstruction<T>,
-      key_: C
+      key_: ID
     ) => void,
     thisArg?: any
   ): void;
   clear(): void;
-  delete<T>(constructor_: StandardConstructor<T>): boolean;
+  delete<T>(identifier_: Identifier<T>): boolean;
 };
 
 export class LazyContainer extends Disposable {
@@ -70,7 +70,7 @@ export class LazyContainer extends Disposable {
   private readonly _errorEventHandler: EventHandler<
     this,
     EventArgs<{
-      constructor: StandardConstructor;
+      identifier: Identifier;
       kind: ErrorKind;
     }>
   >;
@@ -108,9 +108,11 @@ export class LazyContainer extends Disposable {
   public get onError() {
     return this._errorEventHandler.event;
   }
+
   public get onResolved() {
     return this._resolvedEventHandler.event;
   }
+
   public get onConstructed() {
     return this._constructedEventHandler.event;
   }
@@ -120,8 +122,8 @@ export class LazyContainer extends Disposable {
   }
 
   public inheritedScope(scopeId_: string): LazyContainer {
-    return this.scope(this._inheritedScopes, scopeId_, (constructor_, mode_) =>
-      this.getInstanceResolver(constructor_, mode_)
+    return this.scope(this._inheritedScopes, scopeId_, (identifier_, mode_) =>
+      this.getInstanceResolver(identifier_, mode_)
     );
   }
 
@@ -140,16 +142,39 @@ export class LazyContainer extends Disposable {
     return scopedContainer;
   }
 
-  public instruct<T>(
-    constructor_: StandardConstructor<T>,
-    instruction_: InstanceInstruction<T>
+  public instruct<T, II extends InstanceInstruction<T>>(
+    identifier_: Identifier<T>,
+    instruction_: II
   ): void | never {
     this.validateDisposed(this);
-    this.validateKnown(constructor_);
-    this._instructionSource.set(constructor_, instruction_);
+    this.validateKnown(identifier_);
+    this._instructionSource.set(identifier_, instruction_);
   }
 
   public provide<T, C extends StandardConstructor<T>>(
+    constructor_: C,
+    ...parameters_: ConstructableParameters<C>
+  ): void | never;
+  public provide<T, C extends StandardConstructor<T>>(
+    key_: InjectionKey<T>,
+    constructor_: C
+  ): void | never;
+
+  public provide<T, C extends StandardConstructor<T>>(
+    identifier_: C | InjectionKey<T>,
+    ...params_: [C] | ConstructableParameters<C>
+  ): void | never {
+    if (typeof identifier_ === 'symbol') {
+      this.provideKey(identifier_, params_[0] as C);
+    } else {
+      this.provideConstructor(
+        identifier_,
+        ...(params_ as ConstructableParameters<C>)
+      );
+    }
+  }
+
+  private provideConstructor<T, C extends StandardConstructor<T>>(
     constructor_: C,
     ...parameters_: ConstructableParameters<C>
   ): void | never {
@@ -161,88 +186,152 @@ export class LazyContainer extends Disposable {
     );
   }
 
+  private provideKey<T, C extends StandardConstructor<T>>(
+    key_: InjectionKey<T>,
+    constructor_: C
+  ): void | never {
+    this.validateDisposed(this);
+    this.validateKnown(key_);
+    this.instruct(key_, (mode_) => this.resolve(constructor_, mode_));
+  }
+
+  // public provide<T, C extends StandardConstructor<T>>(
+  //   constructor_: C,
+  //   ...parameters_: ConstructableParameters<C>
+  // ): void | never {
+  //   this.validateDisposed(this);
+  //   this.validateKnown(constructor_);
+  //   this.instruct(
+  //     constructor_,
+  //     (mode_) => new constructor_(...this.resolveParameters(parameters_, mode_))
+  //   );
+  // }
+
+  // public provideKey<T, C extends StandardConstructor<T>>(
+  //   key_: InjectionKey<T>,
+  //   constructor_: C
+  // ): void | never {
+  //   this.validateDisposed(this);
+  //   this.validateKnown(key_);
+  //   this.instruct(key_, (mode_) => this.resolve(constructor_, mode_));
+  // }
+
   public resolve<T>(
-    constructor_: StandardConstructor<T>,
+    identifier_: Identifier<T>,
     mode_: ResolveMode = 'singleton'
   ): T | never {
     this.validateDisposed(this);
-    const instanceResolver = this.getInstanceResolver<T>(constructor_, mode_);
+    const instanceResolver = this.getInstanceResolver(identifier_, mode_);
 
     if (instanceResolver) {
       const instance = instanceResolver();
       this._resolvedEventHandler.invoke(
         this,
-        new InstanceEventArgs({ constructor: constructor_, instance: instance })
+        new InstanceEventArgs({ identifier: identifier_, instance: instance })
       );
+
       return instance;
     }
 
     this.throwError(
-      constructor_,
+      identifier_,
       this.resolve.name,
-      `"${constructor_.name}" could not be resolved`,
+      `"${this.identifierName(identifier_)}" could not be resolved`,
       'missing'
     );
   }
 
-  public flush<C extends StandardConstructor>(constructor_: C): boolean {
-    return this._singletonSource.delete(constructor_);
+  public removeSingleton<ID extends Identifier>(
+    identifier_: ID,
+    includeScopes_ = false
+  ): void {
+    this._singletonSource.delete(identifier_);
+
+    if (!includeScopes_) {
+      return;
+    }
+
+    this.forEachScope((scope_) => {
+      scope_.removeSingleton(identifier_, true);
+    });
   }
 
-  private validateKnown<C extends StandardConstructor>(
-    constructor_: C
-  ): void | never {
-    if (this._instructionSource.has<C>(constructor_)) {
+  public clearSingletons(includeScopes_ = false): void {
+    this._singletonSource.clear();
+
+    if (!includeScopes_) {
+      return;
+    }
+
+    this.forEachScope((scope_) => {
+      scope_.clearSingletons(true);
+    });
+  }
+
+  private forEachScope(handler_: (scope_: LazyContainer) => void) {
+    this._isolatedScopes.forEach(handler_);
+    this._inheritedScopes.forEach(handler_);
+  }
+
+  private validateKnown<ID extends Identifier>(identifier_: ID): void | never {
+    if (this._instructionSource.has<ID>(identifier_)) {
       this.throwError(
-        constructor_,
+        identifier_,
         this.validateKnown.name,
-        `"${constructor_.name}" already configured`,
+        `"${this.identifierName(identifier_)}" already configured`,
         'duplicate'
       );
     }
   }
 
+  private identifierName(identifier_: Identifier): string {
+    return typeof identifier_ === 'symbol'
+      ? identifier_.toString()
+      : identifier_.name;
+  }
+
   private getInstanceResolver<T>(
-    constructor_: StandardConstructor<T>,
+    identifier_: Identifier<T>,
     mode_: ResolveMode
   ): InstanceResolver<T> | undefined {
     switch (mode_) {
       case 'singleton':
         return (
-          this._singletonSource.get(constructor_) ??
-          this.resolveInstruction(constructor_, mode_) ??
-          this._resolveFromScope?.(constructor_, mode_)
+          this._singletonSource.get(identifier_) ??
+          this.resolveInstruction(identifier_, mode_) ??
+          this._resolveFromScope?.(identifier_, mode_)
         );
       case 'unique':
         return (
-          this.resolveInstruction(constructor_, 'singleton') ??
-          this._resolveFromScope?.(constructor_, 'singleton')
+          this.resolveInstruction(identifier_, 'singleton') ??
+          this._resolveFromScope?.(identifier_, 'singleton')
         );
       case 'deep-unique':
         return (
-          this.resolveInstruction(constructor_, mode_) ??
-          this._resolveFromScope?.(constructor_, mode_)
+          this.resolveInstruction(identifier_, mode_) ??
+          this._resolveFromScope?.(identifier_, mode_)
         );
     }
   }
 
   private resolveInstruction<T>(
-    constructor_: StandardConstructor<T>,
+    identifier_: Identifier<T>,
     mode_: ResolveMode
   ): InstanceResolver<T> | undefined {
-    const instruction = this._instructionSource.get(constructor_);
+    const instruction = this._instructionSource.get(identifier_);
 
     if (instruction) {
       const instance = instruction(mode_);
       this._constructedEventHandler.invoke(
         this,
-        new InstanceEventArgs({ constructor: constructor_, instance: instance })
+        new InstanceEventArgs({ identifier: identifier_, instance: instance })
       );
 
       const instanceResolver: InstanceResolver<T> = () => instance;
 
       if (mode_ === 'singleton') {
-        this._singletonSource.set<T>(constructor_, instanceResolver);
+        console.log('set', identifier_)
+        this._singletonSource.set<T>(identifier_, instanceResolver);
       }
 
       return instanceResolver;
@@ -256,9 +345,9 @@ export class LazyContainer extends Disposable {
     // TODO: optimize type assertions
     return parameters_.map((parameter_) =>
       typeof parameter_ === 'function' &&
-      parameter_.toString().startsWith('class')
+      parameter_.toString().startsWith('class') || typeof parameter_ === 'symbol'
         ? this.resolve(
-            parameter_ as StandardConstructor<unknown>,
+            parameter_ as Identifier<unknown>,
             mode_ === 'unique' ? 'singleton' : mode_
           )
         : parameter_
@@ -274,21 +363,17 @@ export class LazyContainer extends Disposable {
   public presolve(): void | never {
     this.validateDisposed(this);
 
-    this._instructionSource.forEach(({}, constructor_) => {
-      this.resolve(constructor_, 'singleton');
+    this._instructionSource.forEach(({}, identifier_) => {
+      this.resolve(identifier_, 'singleton');
     });
 
-    this._inheritedScopes.forEach((inheritedScope_) => {
-      inheritedScope_.presolve();
-    });
-
-    this._isolatedScopes.forEach((isolatedScope_) => {
-      isolatedScope_.presolve();
+    this.forEachScope((scope_) => {
+      scope_.presolve();
     });
   }
 
   private throwError(
-    constructor_: StandardConstructor,
+    identifier_: Identifier,
     origin_: string,
     message_: string,
     kind_: ErrorKind
@@ -297,10 +382,28 @@ export class LazyContainer extends Disposable {
       this,
       new EventArgs({
         kind: kind_,
-        constructor: constructor_
+        identifier: identifier_
       })
     );
 
     throw new Error(`[ts-lazy-container/${origin_}]: ${message_}`);
   }
 }
+
+// interface ITest {
+//   test_: string;
+// }
+
+// class Test implements ITest {
+//   constructor(public readonly test_: string) {}
+// }
+
+// const lz: LazyContainer = null as any;
+// const ik = injectionKey<ITest>();
+
+// lz.provide(ik, Test);
+// lz.provide(ik, Object);
+// lz.provide(Test, '');
+// lz.instruct(Test, () => new Test(''));
+// lz.instruct(ik, () => new Test(''));
+// lz.instruct(ik, () => new Object());

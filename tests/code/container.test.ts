@@ -1,12 +1,17 @@
 import { LazyContainer } from '@/container.js';
+import { injectionKey } from '@/injectionKey.js';
 import { describe, expect, it } from 'vitest';
 
-class A {
+type AT = {
+  something: string | undefined;
+}
+
+class A implements AT {
   something: string | undefined;
 }
 
 class DependsOnA {
-  constructor(private _a: A) {}
+  constructor(private _a: AT) {}
 
   public get a() {
     return this._a;
@@ -71,6 +76,35 @@ describe(LazyContainer, () => {
     expect(container.resolve(WithSimpleParams).valueParam).toBe(42);
     expect(resolvedCount).toBe(7);
     expect(constructedCount).toBe(4);
+  });
+
+  it('injection key', () => {
+    expect.assertions(11);
+    const container = LazyContainer.Create();
+    let errorCount = 0;
+    let resolvedCount = 0;
+    let constructedCount = 0;
+    container.onError.subscribe('error', () => errorCount++);
+    container.onResolved.subscribe('resolved', () => resolvedCount++);
+    container.onConstructed.subscribe('constructed', () => constructedCount++);
+
+    container.provide(A);
+    const ik = injectionKey<AT>('at key');
+    container.provide(ik, A);
+    expect(() => container.provide(ik, A)).toThrow();
+    expect(() => container.instruct(ik, () => new A())).toThrow();
+    container.resolve(ik).something = '42';
+    expect(resolvedCount).toBe(2);
+    expect(constructedCount).toBe(2);
+    expect(errorCount).toBe(2);
+    expect(container.resolve(ik).something).toBe('42');
+    expect(resolvedCount).toBe(3);
+    expect(constructedCount).toBe(2);
+    container.provide(DependsOnA, ik);
+    container.resolve(DependsOnA).a.something = '24';
+    expect(resolvedCount).toBe(5);
+    expect(constructedCount).toBe(3);
+    expect(container.resolve(DependsOnA).a.something).toBe('24');
   });
 
   it('presolve', () => {
@@ -241,7 +275,7 @@ describe(LazyContainer, () => {
     expect(c0v2).toBe(c0v3); // same instance
     expect(c1v2).toBe(c1v3); // same instance; WithSimpleParams is already cached as singleton in scoped container (with b from root container). So providing B to scoped container has no effect
 
-    container.inheritedScope('1').flush(WithSimpleParams);
+    container.inheritedScope('1').removeSingleton(WithSimpleParams);
     const c1v3Flushed = container.inheritedScope('1').resolve(WithSimpleParams);
 
     expect(c1v3).not.toBe(c1v3Flushed); // cache got flushed so a new instance was created
