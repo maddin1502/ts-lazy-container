@@ -118,10 +118,12 @@ export class LazyContainer extends Disposable {
   }
 
   public isolatedScope(scopeId_: string): LazyContainer {
+    this.validateDisposed(this);
     return this.scope(this._isolatedScopes, scopeId_);
   }
 
   public inheritedScope(scopeId_: string): LazyContainer {
+    this.validateDisposed(this);
     return this.scope(this._inheritedScopes, scopeId_, (identifier_, mode_) =>
       this.getInstanceResolver(identifier_, mode_)
     );
@@ -164,6 +166,8 @@ export class LazyContainer extends Disposable {
     identifier_: C | InjectionKey<T>,
     ...params_: [C] | ConstructableParameters<C>
   ): void | never {
+    this.validateDisposed(this);
+
     if (typeof identifier_ === 'symbol') {
       this.provideKey(identifier_, params_[0] as C);
     } else {
@@ -178,7 +182,6 @@ export class LazyContainer extends Disposable {
     constructor_: C,
     ...parameters_: ConstructableParameters<C>
   ): void | never {
-    this.validateDisposed(this);
     this.validateKnown(constructor_);
     this.instruct(
       constructor_,
@@ -245,6 +248,7 @@ export class LazyContainer extends Disposable {
     identifier_: ID,
     includeScopes_ = false
   ): void {
+    this.validateDisposed(this);
     this._singletonSource.delete(identifier_);
 
     if (!includeScopes_) {
@@ -257,6 +261,7 @@ export class LazyContainer extends Disposable {
   }
 
   public clearSingletons(includeScopes_ = false): void {
+    this.validateDisposed(this);
     this._singletonSource.clear();
 
     if (!includeScopes_) {
@@ -330,7 +335,6 @@ export class LazyContainer extends Disposable {
       const instanceResolver: InstanceResolver<T> = () => instance;
 
       if (mode_ === 'singleton') {
-        console.log('set', identifier_)
         this._singletonSource.set<T>(identifier_, instanceResolver);
       }
 
