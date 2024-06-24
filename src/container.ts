@@ -58,6 +58,16 @@ type InstructionSource = {
   delete<T>(identifier_: Identifier<T>): boolean;
 };
 
+/**
+ * This tool controls the creation and distribution of application-wide object instances.
+ * These are created as singletons or unique variants as needed from provided build instructions.
+ * In addition, scopes can be used to refine the distribution
+ *
+ * @export
+ * @class LazyContainer
+ * @extends {Disposable}
+ * @since 1.0.0
+ */
 export class LazyContainer extends Disposable {
   public static Create(): LazyContainer {
     return new LazyContainer();
@@ -105,45 +115,83 @@ export class LazyContainer extends Disposable {
     });
   }
 
+  /**
+   * subscribe/unsubscribe to an event that is triggered when an error occurs
+   *
+   * @public
+   * @readonly
+   * @type {*}
+   * @since 1.0.0
+   */
   public get onError() {
     return this._errorEventHandler.event;
   }
 
+  /**
+   * subscribe/unsubscribe to an event that is triggered when an instance is resolved
+   *
+   * @public
+   * @readonly
+   * @type {*}
+   * @since 1.0.0
+   */
   public get onResolved() {
     return this._resolvedEventHandler.event;
   }
 
+  /**
+   * subscribe/unsubscribe to an event that is triggered when an object is instantiated
+   *
+   * @public
+   * @readonly
+   * @type {*}
+   * @since 1.0.0
+   */
   public get onConstructed() {
     return this._constructedEventHandler.event;
   }
 
+  /**
+   * create/use a sub container that is isolated from its parent container (no access to instances)
+   *
+   * @public
+   * @param {string} scopeId_
+   * @returns {LazyContainer}
+   * @since 1.0.0
+   */
   public isolatedScope(scopeId_: string): LazyContainer {
     this.validateDisposed(this);
-    return this.scope(this._isolatedScopes, scopeId_);
+    return this.getOrCreateScope(this._isolatedScopes, scopeId_);
   }
 
+  /**
+   * create/use a sub container that is able to access instances from its parent container (can override it)
+   *
+   * @public
+   * @param {string} scopeId_
+   * @returns {LazyContainer}
+   * @since 1.0.0
+   */
   public inheritedScope(scopeId_: string): LazyContainer {
     this.validateDisposed(this);
-    return this.scope(this._inheritedScopes, scopeId_, (identifier_, mode_) =>
-      this.getInstanceResolver(identifier_, mode_)
+    return this.getOrCreateScope(
+      this._inheritedScopes,
+      scopeId_,
+      (identifier_, mode_) => this.getInstanceResolver(identifier_, mode_)
     );
   }
 
-  private scope(
-    source_: ScopeSource,
-    scopeId_: string,
-    resolveFromScope_?: ResolveFromScope
-  ): LazyContainer {
-    let scopedContainer = source_.get(scopeId_);
-
-    if (!scopedContainer) {
-      scopedContainer = new LazyContainer(resolveFromScope_);
-      source_.set(scopeId_, scopedContainer);
-    }
-
-    return scopedContainer;
-  }
-
+  /**
+   * Provide an instruction callback that creates an instance of the type defined by the specified identifier (class constructor or injection key).
+   *
+   * @public
+   * @template T
+   * @template {InstanceInstruction<T>} II
+   * @param {Identifier<T>} identifier_
+   * @param {II} instruction_
+   * @returns {(void | never)}
+   * @since 1.0.0
+   */
   public instruct<T, II extends InstanceInstruction<T>>(
     identifier_: Identifier<T>,
     instruction_: II
@@ -176,26 +224,6 @@ export class LazyContainer extends Disposable {
         ...(params_ as ConstructableParameters<C>)
       );
     }
-  }
-
-  private provideConstructor<T, C extends StandardConstructor<T>>(
-    constructor_: C,
-    ...parameters_: ConstructableParameters<C>
-  ): void | never {
-    this.validateKnown(constructor_);
-    this.instruct(
-      constructor_,
-      (mode_) => new constructor_(...this.resolveParameters(parameters_, mode_))
-    );
-  }
-
-  private provideKey<T, C extends StandardConstructor<T>>(
-    key_: InjectionKey<T>,
-    constructor_: C
-  ): void | never {
-    this.validateDisposed(this);
-    this.validateKnown(key_);
-    this.instruct(key_, (mode_) => this.resolve(constructor_, mode_));
   }
 
   // public provide<T, C extends StandardConstructor<T>>(
@@ -273,6 +301,62 @@ export class LazyContainer extends Disposable {
     });
   }
 
+  /**
+   * pre resolve instances as singleton and abandon laziness (including scopes).
+   * HINT: can be used to validate container consistency in tests
+   *
+   * @public
+   * @returns {(void | never)}
+   * @throws {Error} if at least one instance cannot be resolved
+   * @since 1.0.0
+   */
+  public presolve(): void | never {
+    this.validateDisposed(this);
+
+    this._instructionSource.forEach(({}, identifier_) => {
+      this.resolve(identifier_, 'singleton');
+    });
+
+    this.forEachScope((scope_) => {
+      scope_.presolve();
+    });
+  }
+
+  private getOrCreateScope(
+    source_: ScopeSource,
+    scopeId_: string,
+    resolveFromScope_?: ResolveFromScope
+  ): LazyContainer {
+    let scopedContainer = source_.get(scopeId_);
+
+    if (!scopedContainer) {
+      scopedContainer = new LazyContainer(resolveFromScope_);
+      source_.set(scopeId_, scopedContainer);
+    }
+
+    return scopedContainer;
+  }
+
+  private provideConstructor<T, C extends StandardConstructor<T>>(
+    constructor_: C,
+    ...parameters_: ConstructableParameters<C>
+  ): void | never {
+    this.validateKnown(constructor_);
+    this.instruct(
+      constructor_,
+      (mode_) => new constructor_(...this.resolveParameters(parameters_, mode_))
+    );
+  }
+
+  private provideKey<T, C extends StandardConstructor<T>>(
+    key_: InjectionKey<T>,
+    constructor_: C
+  ): void | never {
+    this.validateDisposed(this);
+    this.validateKnown(key_);
+    this.instruct(key_, (mode_) => this.resolve(constructor_, mode_));
+  }
+
   private forEachScope(handler_: (scope_: LazyContainer) => void) {
     this._isolatedScopes.forEach(handler_);
     this._inheritedScopes.forEach(handler_);
@@ -348,32 +432,15 @@ export class LazyContainer extends Disposable {
   ): ConstructorParameters<C> {
     // TODO: optimize type assertions
     return parameters_.map((parameter_) =>
-      typeof parameter_ === 'function' &&
-      parameter_.toString().startsWith('class') || typeof parameter_ === 'symbol'
+      (typeof parameter_ === 'function' &&
+        parameter_.toString().startsWith('class')) ||
+      typeof parameter_ === 'symbol'
         ? this.resolve(
             parameter_ as Identifier<unknown>,
             mode_ === 'unique' ? 'singleton' : mode_
           )
         : parameter_
     ) as ConstructorParameters<C>;
-  }
-
-  /**
-   * pre resolve instances as singleton and abandon laziness (including scopes). HINT: can be used to validate container consistency
-   *
-   * @memberof LazyContainer
-   * @throws {Error}
-   */
-  public presolve(): void | never {
-    this.validateDisposed(this);
-
-    this._instructionSource.forEach(({}, identifier_) => {
-      this.resolve(identifier_, 'singleton');
-    });
-
-    this.forEachScope((scope_) => {
-      scope_.presolve();
-    });
   }
 
   private throwError(
@@ -393,21 +460,3 @@ export class LazyContainer extends Disposable {
     throw new Error(`[ts-lazy-container/${origin_}]: ${message_}`);
   }
 }
-
-// interface ITest {
-//   test_: string;
-// }
-
-// class Test implements ITest {
-//   constructor(public readonly test_: string) {}
-// }
-
-// const lz: LazyContainer = null as any;
-// const ik = injectionKey<ITest>();
-
-// lz.provide(ik, Test);
-// lz.provide(ik, Object);
-// lz.provide(Test, '');
-// lz.instruct(Test, () => new Test(''));
-// lz.instruct(ik, () => new Test(''));
-// lz.instruct(ik, () => new Object());
