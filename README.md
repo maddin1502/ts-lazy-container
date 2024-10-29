@@ -12,11 +12,16 @@ WIP
 ```bash
 npm i ts-lazy-container
 ```
-or
-```bash
-yarn add ts-lazy-container
-```
 
 ## Usage
-WIP
+
+
+
+### Registration
+
+#### Provide
+
+#### Instruct
+
+### Injection
 ...

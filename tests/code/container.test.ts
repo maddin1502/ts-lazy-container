@@ -52,7 +52,7 @@ describe(LazyContainer, () => {
 
     container.provide(A);
     expect(() => container.provide(A)).toThrow();
-    expect(() => container.instruct(A, () => new A())).toThrow();
+    expect(() => container.provideInstruction(A, () => new A())).toThrow();
     container.resolve(A).something = '42';
     expect(resolvedCount).toBe(1);
     expect(constructedCount).toBe(1);
@@ -90,9 +90,9 @@ describe(LazyContainer, () => {
 
     container.provide(A);
     const ik = injectionKey<AT>('at key');
-    container.provide(ik, A);
-    expect(() => container.provide(ik, A)).toThrow();
-    expect(() => container.instruct(ik, () => new A())).toThrow();
+    container.provideKey(ik, A);
+    expect(() => container.provideKey(ik, A)).toThrow();
+    expect(() => container.provideInstruction(ik, () => new A())).toThrow();
     container.resolve(ik).something = '42';
     expect(resolvedCount).toBe(2);
     expect(constructedCount).toBe(2);
@@ -299,7 +299,7 @@ describe(LazyContainer, () => {
     );
     expect(() => container.inheritedScope('')).toThrow('Instance is disposed!');
     expect(() => container.isolatedScope('')).toThrow('Instance is disposed!');
-    expect(() => container.instruct(A, () => new A())).toThrow(
+    expect(() => container.provideInstruction(A, () => new A())).toThrow(
       'Instance is disposed!'
     );
     expect(() => container.presolve()).toThrow('Instance is disposed!');
