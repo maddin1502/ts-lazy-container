@@ -4,13 +4,14 @@ import {
   EventHandler,
   type StandardConstructor
 } from 'ts-lib-extended';
+import { isInjectionKey } from './injectionKey.js';
 import {
   InstanceEventArgs,
   type ConstructableParameters,
+  type Creator,
   type ErrorKind,
   type Identifier,
-  type InjectionKey,
-  type InstanceInstruction,
+  type Instruction,
   type ResolveMode
 } from './types.js';
 
@@ -36,18 +37,12 @@ type InstanceSource = {
   clear(): void;
   delete<T>(identifier_: Identifier<T>): boolean;
 };
-type InstructionSource = {
+type CreatorSource = {
   has<T>(identifier_: Identifier<T>): boolean;
-  get<T>(identifier_: Identifier<T>): InstanceInstruction<T> | undefined;
-  set<T>(
-    identifier_: Identifier<T>,
-    instruction_: InstanceInstruction<T>
-  ): InstructionSource;
+  get<T>(identifier_: Identifier<T>): Creator<T> | undefined;
+  set<T>(identifier_: Identifier<T>, instruction_: Creator<T>): CreatorSource;
   forEach(
-    callbackfn: <T>(
-      value_: InstanceInstruction<T>,
-      key_: Identifier<T>
-    ) => void,
+    callbackfn: <T>(value_: Creator<T>, key_: Identifier<T>) => void,
     thisArg?: unknown
   ): void;
   clear(): void;
@@ -72,7 +67,7 @@ export class LazyContainer extends Disposable {
   private readonly _isolatedScopes: ScopeSource;
   private readonly _inheritedScopes: ScopeSource;
   private readonly _singletonSource: InstanceSource;
-  private readonly _instructionSource: InstructionSource;
+  private readonly _creatorSource: CreatorSource;
   private readonly _errorEventHandler: EventHandler<
     this,
     EventArgs<[Identifier, ErrorKind]>
@@ -81,7 +76,7 @@ export class LazyContainer extends Disposable {
     this,
     InstanceEventArgs<unknown>
   >;
-  private readonly _constructedEventHandler: EventHandler<
+  private readonly _createdEventHandler: EventHandler<
     this,
     InstanceEventArgs<unknown>
   >;
@@ -91,20 +86,20 @@ export class LazyContainer extends Disposable {
     this._isolatedScopes = new Map();
     this._inheritedScopes = new Map();
     this._singletonSource = new Map();
-    this._instructionSource = new Map();
+    this._creatorSource = new Map();
     this._errorEventHandler = new EventHandler();
     this._resolvedEventHandler = new EventHandler();
-    this._constructedEventHandler = new EventHandler();
+    this._createdEventHandler = new EventHandler();
     this._disposers.push(() => {
       this._isolatedScopes.forEach((container) => container.dispose());
       this._isolatedScopes.clear();
       this._inheritedScopes.forEach((container) => container.dispose());
       this._inheritedScopes.clear();
       this._singletonSource.clear();
-      this._instructionSource.clear();
+      this._creatorSource.clear();
       this._errorEventHandler.dispose();
       this._resolvedEventHandler.dispose();
-      this._constructedEventHandler.dispose();
+      this._createdEventHandler.dispose();
     });
   }
 
@@ -133,15 +128,15 @@ export class LazyContainer extends Disposable {
   }
 
   /**
-   * subscribe/unsubscribe to an event that is triggered when an object is instantiated
+   * subscribe/unsubscribe to an event that is triggered when an instance is created
    *
    * @public
    * @readonly
    * @type {*}
    * @since 1.0.0
    */
-  public get onConstructed() {
-    return this._constructedEventHandler.event;
+  public get onCreated() {
+    return this._createdEventHandler.event;
   }
 
   /**
@@ -213,97 +208,79 @@ export class LazyContainer extends Disposable {
   ): void {
     this.validateDisposed(this);
     this.validateKnown(constructor_);
-    this.provideInstruction(
+    this.setCreator(
       constructor_,
       (mode_) => new constructor_(...this.resolveParameters(parameters_, mode_))
     );
   }
 
   /**
-   * Provide/Register an instance creation instruction via an typed injection key.
+   * Provide/Register creation instructions for a specific type (determined by the identifier).
    *
-   * This makes it possible to use types and interfaces that are constructed via a suitable class.
-   * The class provided as parameter is resolved internally; this is only possible if its instance creation instructions are also specified by provide(), provideInstruction().
+   * Use cases:
+   * - custom instructions for class instances
+   * - provide types/interfaces/class instructions based on inheritance/duck-typing (resolve A with B, when B extends/inherits/satisfies A)
+   * - type/interface-based instruction (no need for classes) using typed injection keys
+   *
    *
    * ```ts
-   * class A implements AType {
-   *   constructor(public value: string) {}
-   * }
-   *
    * type AType = {
    *   value: string
    * }
    *
-   * const container = LazyContainer.Create();
-   * container.provide(A, 'hello world')
-   * const aInjectionKey = injectionKey<AType>();
-   * container.provideKey(aInjectionKey, A)
-   *
-   * ...
-   *
-   * const a = container.resolve(aInjectionKey); // a: AType
-   * ```
-   *
-   * @public
-   * @template T
-   * @param {InjectionKey<T>} key_
-   * @param {StandardConstructor<T>} constructor_
-   * @throws {Error} when already provided (duplicate)
-   * @since 1.0.0
-   */
-  public provideKey<T>(
-    key_: InjectionKey<T>,
-    constructor_: StandardConstructor<T>
-  ): void {
-    this.validateDisposed(this);
-    this.validateKnown(key_);
-    this.provideInstruction(key_, (mode_) => this.resolve(constructor_, mode_));
-  }
-
-  /**
-   * Provide/Register an instruction callback that creates an instance of the type defined by the specified identifier (class or injection key).
-   *
-   * This makes it possible to provide instance creation instructions for which no class definition exists.
-   *
-   * ```ts
-   * class A implements AType {
+   * class A1 implements AType {
    *   constructor(public value: string) {}
    * }
    *
-   * type AType = {
-   *   value: string
-   * }
+   * class A2 extends A1 {}
    *
    * const container = LazyContainer.Create();
    * const aInjectionKey = injectionKey<AType>();
-   * container.provideInstruction(aInjectionKey, () => ({value: 'hi'}))
-   * container.provideInstruction(A, () => new A('hello'))
+   * const aInjectionKey2 = injectionKey<AType>();
+   * container.instruct(aInjectionKey, () => ({value: 'hi'}))
+   * container.instruct(A1, () => new A1('hello'))
+   * container.provide(A2, 'greetings')
+   * container.instruct(aInjectionKey2, A2)
    *
    * ...
    *
-   * const a1: AType = container.resolve(aInjectionKey); // value = hi
-   * const a2: AType = container.resolve(A); // value = hello
+   * const aik: AType = container.resolve(aInjectionKey); // value = hi
+   * const a1: AType = container.resolve(A1); // value = hello
+   * const a2: AType = container.resolve(A2); // value = greeting
+   * const aik2: AType = container.resolve(aInjectionKey2); // value = greeting
    * ```
    *
    * @public
    * @template T
-   * @param {Identifier<T>} identifier_
-   * @param {InstanceInstruction<T>} instruction_
-   * @throws {Error} when already provided (duplicate)
+   * @param {Identifier<T>} identifier_ Identifier (class constructor or injection key) that refers to the type to be provided/registered
+   * @param {Instruction<T>} instruction_  Creation instructions: Identifier (class constructor or injection key) that refers to a type that is assignable to the target type; or an instance creation callback
    * @since 1.0.0
    */
-  public provideInstruction<T>(
+  public instruct<T>(
     identifier_: Identifier<T>,
-    instruction_: InstanceInstruction<T>
+    instruction_: Instruction<T>
   ): void {
     this.validateDisposed(this);
     this.validateKnown(identifier_);
-    this._instructionSource.set(identifier_, instruction_);
+
+    this.setCreator(
+      identifier_,
+      this.isIdentifier(instruction_)
+        ? (mode_) => this.resolve(instruction_, mode_)
+        : instruction_
+    );
+  }
+
+  private setCreator<T>(
+    identifier_: Identifier<T>,
+    creator_: Creator<T>
+  ): void {
+    this._creatorSource.set(identifier_, creator_);
   }
 
   /**
    * Resolve an instance using the provided identifier (class or injection key).
-   * Suitable building instructions must be provided in advance via provide(), provideKey() or provideInstructions().
+   * Suitable instructions must be provided in advance via provide() or instruct().
    *
    * ResolveMode:
    *
@@ -401,7 +378,7 @@ export class LazyContainer extends Disposable {
   public presolve(): void {
     this.validateDisposed(this);
 
-    this._instructionSource.forEach((_, identifier_) => {
+    this._creatorSource.forEach((_, identifier_) => {
       this.resolve(identifier_, 'singleton');
     });
 
@@ -431,7 +408,7 @@ export class LazyContainer extends Disposable {
   }
 
   private validateKnown<ID extends Identifier>(identifier_: ID): void {
-    if (this._instructionSource.has(identifier_)) {
+    if (this._creatorSource.has(identifier_)) {
       this.throwError(
         identifier_,
         this.validateKnown.name,
@@ -442,7 +419,7 @@ export class LazyContainer extends Disposable {
   }
 
   private identifierName(identifier_: Identifier): string {
-    return typeof identifier_ === 'symbol'
+    return isInjectionKey(identifier_)
       ? identifier_.toString()
       : identifier_.name;
   }
@@ -475,11 +452,11 @@ export class LazyContainer extends Disposable {
     identifier_: Identifier<T>,
     mode_: ResolveMode
   ): InstanceResolver<T> | undefined {
-    const instruction = this._instructionSource.get(identifier_);
+    const instruction = this._creatorSource.get(identifier_);
 
     if (instruction) {
       const instance = instruction(mode_);
-      this._constructedEventHandler.invoke(
+      this._createdEventHandler.invoke(
         this,
         new InstanceEventArgs(identifier_, instance)
       );
@@ -512,15 +489,16 @@ export class LazyContainer extends Disposable {
     kind_: ErrorKind
   ): never {
     this._errorEventHandler.invoke(this, new EventArgs(identifier_, kind_));
-
     throw new Error(`[ts-lazy-container/${origin_}]: ${message_}`);
   }
 
-  private isIdentifier(value_: unknown): value_ is Identifier {
+  private isConstructor(value_: unknown): value_ is StandardConstructor {
     return (
-      // typeof constructor => function
-      (typeof value_ === 'function' && value_.toString().startsWith('class')) ||
-      typeof value_ === 'symbol'
+      typeof value_ === 'function' && value_.toString().startsWith('class')
     );
+  }
+
+  private isIdentifier(value_: unknown): value_ is Identifier {
+    return this.isConstructor(value_) || isInjectionKey(value_);
   }
 }

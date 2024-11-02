@@ -43,16 +43,17 @@ describe(LazyContainer, () => {
   it('injection', () => {
     expect.assertions(20);
     const container = LazyContainer.Create();
+
     let errorCount = 0;
     let resolvedCount = 0;
     let constructedCount = 0;
     container.onError.subscribe('error', () => errorCount++);
     container.onResolved.subscribe('resolved', () => resolvedCount++);
-    container.onConstructed.subscribe('constructed', () => constructedCount++);
+    container.onCreated.subscribe('constructed', () => constructedCount++);
 
     container.provide(A);
     expect(() => container.provide(A)).toThrow();
-    expect(() => container.provideInstruction(A, () => new A())).toThrow();
+    expect(() => container.instruct(A, () => new A())).toThrow();
     container.resolve(A).something = '42';
     expect(resolvedCount).toBe(1);
     expect(constructedCount).toBe(1);
@@ -86,13 +87,13 @@ describe(LazyContainer, () => {
     let constructedCount = 0;
     container.onError.subscribe('error', () => errorCount++);
     container.onResolved.subscribe('resolved', () => resolvedCount++);
-    container.onConstructed.subscribe('constructed', () => constructedCount++);
+    container.onCreated.subscribe('constructed', () => constructedCount++);
 
     container.provide(A);
     const ik = injectionKey<AT>('at key');
-    container.provideKey(ik, A);
-    expect(() => container.provideKey(ik, A)).toThrow();
-    expect(() => container.provideInstruction(ik, () => new A())).toThrow();
+    container.instruct(ik, A);
+    expect(() => container.instruct(ik, A)).toThrow();
+    expect(() => container.instruct(ik, () => new A())).toThrow();
     container.resolve(ik).something = '42';
     expect(resolvedCount).toBe(2);
     expect(constructedCount).toBe(2);
@@ -115,7 +116,7 @@ describe(LazyContainer, () => {
     let constructedCount = 0;
     container.onError.subscribe('error', () => errorCount++);
     container.onResolved.subscribe('resolved', () => resolvedCount++);
-    container.onConstructed.subscribe('constructed', () => constructedCount++);
+    container.onCreated.subscribe('constructed', () => constructedCount++);
 
     container.provide(DependsOnA, A);
     expect(() => container.presolve()).toThrow();
@@ -151,7 +152,7 @@ describe(LazyContainer, () => {
     let constructedCount = 0;
     container.onError.subscribe('error', () => errorCount++);
     container.onResolved.subscribe('resolved', () => resolvedCount++);
-    container.onConstructed.subscribe('constructed', () => constructedCount++);
+    container.onCreated.subscribe('constructed', () => constructedCount++);
 
     container.provide(B);
     container.provide(WithSimpleParams, B, 42, [42, 42], () => 84);
@@ -229,7 +230,7 @@ describe(LazyContainer, () => {
     let constructedCount = 0;
     container.onError.subscribe('error', () => errorCount++);
     container.onResolved.subscribe('resolved', () => resolvedCount++);
-    container.onConstructed.subscribe('constructed', () => constructedCount++);
+    container.onCreated.subscribe('constructed', () => constructedCount++);
 
     expect(() =>
       container.inheritedScope('1').resolve(WithSimpleParams)
@@ -294,12 +295,12 @@ describe(LazyContainer, () => {
     expect(() => container.onResolved.subscribe('', () => {})).toThrow(
       'Instance is disposed!'
     );
-    expect(() => container.onConstructed.subscribe('', () => {})).toThrow(
+    expect(() => container.onCreated.subscribe('', () => {})).toThrow(
       'Instance is disposed!'
     );
     expect(() => container.inheritedScope('')).toThrow('Instance is disposed!');
     expect(() => container.isolatedScope('')).toThrow('Instance is disposed!');
-    expect(() => container.provideInstruction(A, () => new A())).toThrow(
+    expect(() => container.instruct(A, () => new A())).toThrow(
       'Instance is disposed!'
     );
     expect(() => container.presolve()).toThrow('Instance is disposed!');
