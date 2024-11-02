@@ -160,64 +160,70 @@ describe(LazyContainer, () => {
     expect(container.resolve(WithSimpleParams).arrayParam).toEqual([42, 42]);
     expect(container.resolve(WithSimpleParams).functionParam()).toBe(84);
     expect(() =>
-      container.isolatedScope('1').resolve(WithSimpleParams)
+      container.scope(1).isolated.resolve(WithSimpleParams)
     ).toThrow();
-    container.isolatedScope('1').provide(B);
+    container.scope(1).isolated.provide(B);
     expect(() =>
-      container.isolatedScope('1').resolve(WithSimpleParams)
+      container.scope(1).isolated.resolve(WithSimpleParams)
     ).toThrow();
     container
-      .isolatedScope('1')
-      .provide(WithSimpleParams, B, 4242, [4242, 4242], () => 8484);
+      .scope(1)
+      .isolated.provide(WithSimpleParams, B, 4242, [4242, 4242], () => 8484);
     expect(container.resolve(WithSimpleParams).valueParam).toBe(42);
     expect(container.resolve(WithSimpleParams).arrayParam).toEqual([42, 42]);
     expect(container.resolve(WithSimpleParams).functionParam()).toBe(84);
     expect(
-      container.isolatedScope('1').resolve(WithSimpleParams).valueParam
+      container.scope(1).isolated.resolve(WithSimpleParams).valueParam
     ).toBe(4242);
     expect(
-      container.isolatedScope('1').resolve(WithSimpleParams).arrayParam
+      container.scope(1).isolated.resolve(WithSimpleParams).arrayParam
     ).toEqual([4242, 4242]);
     expect(
-      container.isolatedScope('1').resolve(WithSimpleParams).functionParam()
+      container.scope(1).isolated.resolve(WithSimpleParams).functionParam()
     ).toBe(8484);
 
     expect(() =>
-      container.isolatedScope('1').isolatedScope('1').resolve(WithSimpleParams)
+      container.scope(1).isolated.scope(1).isolated.resolve(WithSimpleParams)
     );
-    container.isolatedScope('1').isolatedScope('1').provide(B);
+    container.scope(1).isolated.scope(1).isolated.provide(B);
     expect(() =>
-      container.isolatedScope('1').isolatedScope('1').resolve(WithSimpleParams)
+      container.scope(1).isolated.scope(1).isolated.resolve(WithSimpleParams)
     );
     container
-      .isolatedScope('1')
-      .isolatedScope('1')
-      .provide(WithSimpleParams, B, 424242, [424242, 424242], () => 848484);
+      .scope(1)
+      .isolated.scope(1)
+      .isolated.provide(
+        WithSimpleParams,
+        B,
+        424242,
+        [424242, 424242],
+        () => 848484
+      );
     expect(container.resolve(WithSimpleParams).valueParam).toBe(42);
     expect(container.resolve(WithSimpleParams).arrayParam).toEqual([42, 42]);
     expect(container.resolve(WithSimpleParams).functionParam()).toBe(84);
     expect(
-      container.isolatedScope('1').resolve(WithSimpleParams).valueParam
+      container.scope(1).isolated.resolve(WithSimpleParams).valueParam
     ).toBe(4242);
     expect(
-      container.isolatedScope('1').resolve(WithSimpleParams).arrayParam
+      container.scope(1).isolated.resolve(WithSimpleParams).arrayParam
     ).toEqual([4242, 4242]);
     expect(
-      container.isolatedScope('1').resolve(WithSimpleParams).functionParam()
+      container.scope(1).isolated.resolve(WithSimpleParams).functionParam()
     ).toBe(8484);
     expect(
-      container.isolatedScope('1').isolatedScope('1').resolve(WithSimpleParams)
+      container.scope(1).isolated.scope(1).isolated.resolve(WithSimpleParams)
         .valueParam
     ).toBe(424242);
     expect(
-      container.isolatedScope('1').isolatedScope('1').resolve(WithSimpleParams)
+      container.scope(1).isolated.scope(1).isolated.resolve(WithSimpleParams)
         .arrayParam
     ).toEqual([424242, 424242]);
     expect(
       container
-        .isolatedScope('1')
-        .isolatedScope('1')
-        .resolve(WithSimpleParams)
+        .scope(1)
+        .isolated.scope(1)
+        .isolated.resolve(WithSimpleParams)
         .functionParam()
     ).toBe(848484);
   });
@@ -233,36 +239,36 @@ describe(LazyContainer, () => {
     container.onCreated.subscribe('constructed', () => constructedCount++);
 
     expect(() =>
-      container.inheritedScope('1').resolve(WithSimpleParams)
+      container.scope(1).inherited.resolve(WithSimpleParams)
     ).toThrow();
     container.provide(B);
     expect(() =>
-      container.inheritedScope('1').resolve(WithSimpleParams)
+      container.scope(1).inherited.resolve(WithSimpleParams)
     ).toThrow();
     container.provide(WithSimpleParams, B, 42, [42, 42], () => 84);
     const c0 = container.resolve(WithSimpleParams);
-    const c1 = container.inheritedScope('1').resolve(WithSimpleParams);
+    const c1 = container.scope(1).inherited.resolve(WithSimpleParams);
     expect(c0).toBe(c1); // both got resolved from root container
     expect(c0.b).toBe(c1.b); // both b's got resolved from root container
     expect(c1.valueParam).toBe(42);
     expect(c1.arrayParam).toEqual([42, 42]);
     expect(c1.functionParam()).toBe(84);
     container
-      .inheritedScope('1')
-      .provide(WithSimpleParams, B, 4242, [4242, 4242], () => 8484);
+      .scope(1)
+      .inherited.provide(WithSimpleParams, B, 4242, [4242, 4242], () => 8484);
 
     const c0v2 = container.resolve(WithSimpleParams);
-    const c1v2 = container.inheritedScope('1').resolve(WithSimpleParams);
+    const c1v2 = container.scope(1).inherited.resolve(WithSimpleParams);
     expect(c0v2).not.toBe(c1v2); // c0v2 got resolved from root container; c1v2 got resolved from scope
     expect(c0v2.b).toBe(c1v2.b); // B is still not provided in scope container so both b's are from root container
     expect(c1v2.valueParam).toBe(4242);
     expect(c1v2.arrayParam).toEqual([4242, 4242]);
     expect(c1v2.functionParam()).toBe(8484);
 
-    container.inheritedScope('1').provide(B);
+    container.scope(1).inherited.provide(B);
 
     const c0v3 = container.resolve(WithSimpleParams);
-    const c1v3 = container.inheritedScope('1').resolve(WithSimpleParams);
+    const c1v3 = container.scope(1).inherited.resolve(WithSimpleParams);
 
     expect(c0v2).toBe(c0v3); // same instance
     expect(c1v2).toBe(c1v3); // same instance; WithSimpleParams is already cached as singleton in scoped container (with b from root container). So providing B to scoped container has no effect
@@ -271,13 +277,13 @@ describe(LazyContainer, () => {
     const c0v3Flushed = container.resolve(WithSimpleParams);
 
     expect(c0v3).not.toBe(c0v3Flushed); // cache got flushed so a new instance was created
-    expect(c1v3).toBe(container.inheritedScope('1').resolve(WithSimpleParams)); // scope 1 cache wasn't flushed
+    expect(c1v3).toBe(container.scope(1).inherited.resolve(WithSimpleParams)); // scope 1 cache wasn't flushed
     expect(c0v3Flushed.b).toBe(container.resolve(B)); // new instance got B from scoped container
 
     container.removeSingleton(WithSimpleParams, true);
     expect(c0v3Flushed).not.toBe(container.resolve(WithSimpleParams)); // cache got flushed so a new instance was created
     expect(c1v3).not.toBe(
-      container.inheritedScope('1').resolve(WithSimpleParams)
+      container.scope(1).inherited.resolve(WithSimpleParams)
     ); // scope 1 cache got flushed so a new instance was created
   });
 
@@ -298,8 +304,10 @@ describe(LazyContainer, () => {
     expect(() => container.onCreated.subscribe('', () => {})).toThrow(
       'Instance is disposed!'
     );
-    expect(() => container.inheritedScope('')).toThrow('Instance is disposed!');
-    expect(() => container.isolatedScope('')).toThrow('Instance is disposed!');
+    expect(() => container.scope('').inherited).toThrow(
+      'Instance is disposed!'
+    );
+    expect(() => container.scope('').isolated).toThrow('Instance is disposed!');
     expect(() => container.instruct(A, () => new A())).toThrow(
       'Instance is disposed!'
     );
@@ -312,19 +320,19 @@ describe(LazyContainer, () => {
     expect.assertions(6);
     const container = LazyContainer.Create();
     container.provide(A);
-    container.isolatedScope('1').provide(A);
-    container.inheritedScope('1').provide(A);
+    container.scope(1).isolated.provide(A);
+    container.scope(1).inherited.provide(A);
     const c0A = container.resolve(A);
-    const c1IsoA = container.isolatedScope('1').resolve(A);
-    const c1InhA = container.inheritedScope('1').resolve(A);
+    const c1IsoA = container.scope(1).isolated.resolve(A);
+    const c1InhA = container.scope(1).inherited.resolve(A);
     container.clearSingletons();
     expect(container.resolve(A)).not.toBe(c0A);
-    expect(container.inheritedScope('1').resolve(A)).toBe(c1InhA);
-    expect(container.isolatedScope('1').resolve(A)).toBe(c1IsoA);
+    expect(container.scope(1).inherited.resolve(A)).toBe(c1InhA);
+    expect(container.scope(1).isolated.resolve(A)).toBe(c1IsoA);
     container.clearSingletons(true);
     expect(container.resolve(A)).not.toBe(c0A);
-    expect(container.inheritedScope('1').resolve(A)).not.toBe(c1InhA);
-    expect(container.isolatedScope('1').resolve(A)).not.toBe(c1IsoA);
+    expect(container.scope(1).inherited.resolve(A)).not.toBe(c1InhA);
+    expect(container.scope(1).isolated.resolve(A)).not.toBe(c1IsoA);
   });
 
   it('resolve mode', () => {

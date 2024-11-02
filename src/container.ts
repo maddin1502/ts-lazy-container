@@ -5,6 +5,7 @@ import {
   type StandardConstructor
 } from 'ts-lib-extended';
 import { isInjectionKey } from './injectionKey.js';
+import { Scope, Scopes } from './scope.js';
 import {
   InstanceEventArgs,
   type ConstructableParameters,
@@ -20,8 +21,6 @@ type ResolveFromScope = <T>(
   identifier_: Identifier<T>,
   mode_: ResolveMode
 ) => InstanceResolver<T> | undefined;
-
-type ScopeSource = Map<string, LazyContainer>;
 
 type InstanceSource = {
   has<T>(identifier_: Identifier<T>): boolean;
@@ -64,8 +63,7 @@ export class LazyContainer extends Disposable {
     return new LazyContainer();
   }
 
-  private readonly _isolatedScopes: ScopeSource;
-  private readonly _inheritedScopes: ScopeSource;
+  private readonly _scopes: Scopes<LazyContainer>;
   private readonly _singletonSource: InstanceSource;
   private readonly _creatorSource: CreatorSource;
   private readonly _errorEventHandler: EventHandler<
@@ -83,18 +81,22 @@ export class LazyContainer extends Disposable {
 
   private constructor(private readonly _resolveFromScope?: ResolveFromScope) {
     super();
-    this._isolatedScopes = new Map();
-    this._inheritedScopes = new Map();
+    this._scopes = new Scopes(
+      (scopeMode_) =>
+        new LazyContainer(
+          scopeMode_ === 'inherited'
+            ? (identifier_, mode_) =>
+                this.getInstanceResolver(identifier_, mode_)
+            : undefined
+        )
+    );
     this._singletonSource = new Map();
     this._creatorSource = new Map();
     this._errorEventHandler = new EventHandler();
     this._resolvedEventHandler = new EventHandler();
     this._createdEventHandler = new EventHandler();
     this._disposers.push(() => {
-      this._isolatedScopes.forEach((container) => container.dispose());
-      this._isolatedScopes.clear();
-      this._inheritedScopes.forEach((container) => container.dispose());
-      this._inheritedScopes.clear();
+      this._scopes.dispose();
       this._singletonSource.clear();
       this._creatorSource.clear();
       this._errorEventHandler.dispose();
@@ -140,33 +142,15 @@ export class LazyContainer extends Disposable {
   }
 
   /**
-   * create/use a sub container that is isolated from its parent container (no access to instances)
+   * create/use a sub container
    *
    * @public
-   * @param {string} scopeId_
-   * @returns {LazyContainer}
+   * @param {PropertyKey} scopeId_
+   * @returns {Scope<LazyContainer>}
    * @since 1.0.0
    */
-  public isolatedScope(scopeId_: string): LazyContainer {
-    this.validateDisposed(this);
-    return this.getOrCreateScope(this._isolatedScopes, scopeId_);
-  }
-
-  /**
-   * create/use a sub container that is able to access instances from its parent container (can override it)
-   *
-   * @public
-   * @param {string} scopeId_
-   * @returns {LazyContainer}
-   * @since 1.0.0
-   */
-  public inheritedScope(scopeId_: string): LazyContainer {
-    this.validateDisposed(this);
-    return this.getOrCreateScope(
-      this._inheritedScopes,
-      scopeId_,
-      (identifier_, mode_) => this.getInstanceResolver(identifier_, mode_)
-    );
+  public scope(scopeId_: PropertyKey): Scope<LazyContainer> {
+    return this._scopes.get(scopeId_);
   }
 
   /**
@@ -341,8 +325,8 @@ export class LazyContainer extends Disposable {
       return;
     }
 
-    this.forEachScope((scope_) => {
-      scope_.removeSingleton(identifier_, true);
+    this._scopes.forEach((scopedContainer_) => {
+      scopedContainer_.removeSingleton(identifier_, true);
     });
   }
 
@@ -361,8 +345,8 @@ export class LazyContainer extends Disposable {
       return;
     }
 
-    this.forEachScope((scope_) => {
-      scope_.clearSingletons(true);
+    this._scopes.forEach((scopedContainer_) => {
+      scopedContainer_.clearSingletons(true);
     });
   }
 
@@ -382,29 +366,9 @@ export class LazyContainer extends Disposable {
       this.resolve(identifier_, 'singleton');
     });
 
-    this.forEachScope((scope_) => {
-      scope_.presolve();
+    this._scopes.forEach((scopeContainer_) => {
+      scopeContainer_.presolve();
     });
-  }
-
-  private getOrCreateScope(
-    source_: ScopeSource,
-    scopeId_: string,
-    resolveFromScope_?: ResolveFromScope
-  ): LazyContainer {
-    let scopedContainer = source_.get(scopeId_);
-
-    if (!scopedContainer) {
-      scopedContainer = new LazyContainer(resolveFromScope_);
-      source_.set(scopeId_, scopedContainer);
-    }
-
-    return scopedContainer;
-  }
-
-  private forEachScope(handler_: (scope_: LazyContainer) => void) {
-    this._isolatedScopes.forEach(handler_);
-    this._inheritedScopes.forEach(handler_);
   }
 
   private validateKnown<ID extends Identifier>(identifier_: ID): void {
