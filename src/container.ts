@@ -1,5 +1,6 @@
 import {
   Disposable,
+  Event,
   EventArgs,
   EventHandler,
   type StandardConstructor
@@ -47,6 +48,13 @@ type CreatorSource = {
   clear(): void;
   delete<T>(identifier_: Identifier<T>): boolean;
 };
+
+// export interface Container {
+//   onError: Event<this, EventArgs<[Identifier, ErrorKind]>>;
+//   onResolved: Event<this, InstanceEventArgs<unknown>>;
+//   onCreated: Event<this, InstanceEventArgs<unknown>>;
+//   scope(scopeId_: PropertyKey): Scope<Container>;
+// }
 
 /**
  * This tool controls the creation and distribution of application-wide object instances.
@@ -110,10 +118,10 @@ export class LazyContainer extends Disposable {
    *
    * @public
    * @readonly
-   * @type {*}
+   * @type {Event<this, EventArgs<[Identifier, ErrorKind]>>}
    * @since 1.0.0
    */
-  public get onError() {
+  public get onError(): Event<this, EventArgs<[Identifier, ErrorKind]>> {
     return this._errorEventHandler.event;
   }
 
@@ -122,10 +130,10 @@ export class LazyContainer extends Disposable {
    *
    * @public
    * @readonly
-   * @type {*}
+   * @type {Event<this, InstanceEventArgs<unknown>>}
    * @since 1.0.0
    */
-  public get onResolved() {
+  public get onResolved(): Event<this, InstanceEventArgs<unknown>> {
     return this._resolvedEventHandler.event;
   }
 
@@ -134,10 +142,10 @@ export class LazyContainer extends Disposable {
    *
    * @public
    * @readonly
-   * @type {*}
+   * @type {Event<this, InstanceEventArgs<unknown>>}
    * @since 1.0.0
    */
-  public get onCreated() {
+  public get onCreated(): Event<this, InstanceEventArgs<unknown>> {
     return this._createdEventHandler.event;
   }
 
@@ -325,9 +333,9 @@ export class LazyContainer extends Disposable {
       return;
     }
 
-    this._scopes.forEach((scopedContainer_) => {
-      scopedContainer_.removeSingleton(identifier_, true);
-    });
+    this._scopes.forEachInstance((_mode, scopedContainer_) =>
+      scopedContainer_.removeSingleton(identifier_, true)
+    );
   }
 
   /**
@@ -345,9 +353,9 @@ export class LazyContainer extends Disposable {
       return;
     }
 
-    this._scopes.forEach((scopedContainer_) => {
-      scopedContainer_.clearSingletons(true);
-    });
+    this._scopes.forEachInstance((_mode, scopedContainer_) =>
+      scopedContainer_.clearSingletons(true)
+    );
   }
 
   /**
@@ -366,9 +374,9 @@ export class LazyContainer extends Disposable {
       this.resolve(identifier_, 'singleton');
     });
 
-    this._scopes.forEach((scopeContainer_) => {
-      scopeContainer_.presolve();
-    });
+    this._scopes.forEachInstance((_mode, scopeContainer_) =>
+      scopeContainer_.presolve()
+    );
   }
 
   private validateKnown<ID extends Identifier>(identifier_: ID): void {
