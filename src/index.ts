@@ -1,4 +1,4 @@
-export { LazyContainer } from './container.js';
+export * from './container.js';
 export * from './injectionKey.js';
-export { Scope, Scopes } from './scope.js';
-export type * from './types.js';
+export * from './scope.js';
+export * from './types.js';

@@ -1,46 +1,33 @@
 import { Disposable } from 'ts-lib-extended';
 
-export type InstanceScopeHandler<T, Mode extends string> = (
-  mode_: Mode,
-  instance_: T
-) => void;
-export type InstanceScope<T, Mode extends string> = {
-  readonly [key in Mode]: T;
+export type InstanceScope<T, Shape extends string = 'get'> = {
+  readonly [key in Shape]: T;
 } & {
-  forEach(handler_: InstanceScopeHandler<T, Mode>): void;
+  instances: T[];
 };
-export type InstanceScopesHandler<T, Mode extends string> = (
-  scope_: InstanceScope<T, Mode>
-) => void;
-export type InstanceScopes<T, Mode extends string> = {
-  get(id_: PropertyKey): InstanceScope<T, Mode>;
-  forEach(handler_: InstanceScopesHandler<T, Mode>): void;
-  forEachInstance(handler_: InstanceScopeHandler<T, Mode>): void;
-};
+export interface ScopedInstance<Shape extends string = 'get'> {
+  scope(id_: PropertyKey): InstanceScope<this, Shape>;
+  scopes: InstanceScope<this, Shape>[];
+}
 
-
-
-
-type ScopeMode = 'inherited' | 'isolated';
-type ScopeSource<
-  T extends Disposable,
-  Mode extends ScopeMode
-> = Map<Mode, T>;
+export type LazyContainerShape = 'inherited' | 'isolated';
+type ScopeSource<T extends Disposable, Shape extends LazyContainerShape> = Map<
+  Shape,
+  T
+>;
 type ScopesSource<T extends Disposable> = Map<
   PropertyKey,
-  Scope<T>
+  LazyContainerScope<T>
 >;
-type CreateScopedInstance<T extends Disposable> = (
-  mode_: ScopeMode
-) => T;
+type CreateScopedInstance<T> = (shape_: LazyContainerShape) => T;
 
-export class Scopes<T extends Disposable>
+export abstract class ScopedLazyContainer
   extends Disposable
-  implements InstanceScopes<T, ScopeMode>
+  implements ScopedInstance<LazyContainerShape>
 {
-  private readonly _source: ScopesSource<T>;
+  private readonly _source: ScopesSource<this>;
 
-  constructor(private _create: CreateScopedInstance<T>) {
+  constructor() {
     super();
     this._source = new Map();
 
@@ -50,50 +37,49 @@ export class Scopes<T extends Disposable>
     });
   }
 
-  public get(id_: PropertyKey): Scope<T> {
+  protected abstract createScopeInstance(shape_: LazyContainerShape): this;
+
+  public scope(id_: PropertyKey): LazyContainerScope<this> {
     this.validateDisposed(this);
     let scope = this._source.get(id_);
 
     if (!scope) {
-      scope = new Scope((...params_) => this._create(...params_));
+      scope = new LazyContainerScope((...params_) =>
+        this.createScopeInstance(...params_)
+      );
       this._source.set(id_, scope);
     }
 
     return scope;
   }
 
-  public forEach(
-    handler_: InstanceScopesHandler<T, ScopeMode>
-  ): void {
+  public get scopes(): LazyContainerScope<this>[] {
     this.validateDisposed(this);
-    this._source.forEach((scope_) => handler_(scope_));
+    return [...this._source.values()];
   }
 
-  public forEachInstance(
-    handler_: InstanceScopeHandler<T, ScopeMode>
-  ) {
-    this.validateDisposed(this);
-    this._source.forEach((scope_) =>
-      scope_.forEach((...params_) => handler_(...params_))
-    );
-  }
+  // public forEachScopeInstance(
+  //   callbackFn_: ShapedInstanceCallback<this, LazyContainerShape>
+  // ) {
+  //   this.validateDisposed(this);
+  //   this._source.forEach((scope_) =>
+  //     scope_.forEach((...params_) => callbackFn_(...params_))
+  //   );
+  // }
 }
 
-export class Scope<T extends Disposable>
+export class LazyContainerScope<T extends Disposable>
   extends Disposable
-  implements InstanceScope<T, ScopeMode>
+  implements InstanceScope<T, LazyContainerShape>
 {
-  private readonly _source: ScopeSource<
-    T,
-    ScopeMode
-  >;
+  private readonly _source: ScopeSource<T, LazyContainerShape>;
 
   constructor(private _create: CreateScopedInstance<T>) {
     super();
     this._source = new Map();
 
     this._disposers.push(() => {
-      this.forEach((_, instance_) => instance_.dispose());
+      this.instances.forEach((instance_) => instance_.dispose());
       this._source.clear();
     });
   }
@@ -124,19 +110,17 @@ export class Scope<T extends Disposable>
     return this.getOrCreateInstance('isolated');
   }
 
-  public forEach(
-    handler_: InstanceScopeHandler<T, ScopeMode>
-  ): void {
+  public get instances(): T[] {
     this.validateDisposed(this);
-    this._source.forEach((instance_, mode_) => handler_(mode_, instance_));
+    return [...this._source.values()];
   }
 
-  private getOrCreateInstance(mode_: ScopeMode): T {
-    let instance = this._source.get(mode_);
+  private getOrCreateInstance(shape_: LazyContainerShape): T {
+    let instance = this._source.get(shape_);
 
     if (!instance) {
-      instance = this._create(mode_);
-      this._source.set(mode_, instance);
+      instance = this._create(shape_);
+      this._source.set(shape_, instance);
     }
 
     return instance;

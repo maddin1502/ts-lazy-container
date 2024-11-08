@@ -1,12 +1,11 @@
 import {
-  Disposable,
   Event,
   EventArgs,
   EventHandler,
   type StandardConstructor
 } from 'ts-lib-extended';
 import { isInjectionKey } from './injectionKey.js';
-import { Scope, Scopes } from './scope.js';
+import { ScopedLazyContainer, type LazyContainerShape } from './scope.js';
 import {
   InstanceEventArgs,
   type ConstructableParameters,
@@ -49,13 +48,6 @@ type CreatorSource = {
   delete<T>(identifier_: Identifier<T>): boolean;
 };
 
-// export interface Container {
-//   onError: Event<this, EventArgs<[Identifier, ErrorKind]>>;
-//   onResolved: Event<this, InstanceEventArgs<unknown>>;
-//   onCreated: Event<this, InstanceEventArgs<unknown>>;
-//   scope(scopeId_: PropertyKey): Scope<Container>;
-// }
-
 /**
  * This tool controls the creation and distribution of application-wide object instances.
  * These are created as singletons or unique variants as needed from provided build instructions.
@@ -66,12 +58,11 @@ type CreatorSource = {
  * @extends {Disposable}
  * @since 1.0.0
  */
-export class LazyContainer extends Disposable {
+export class LazyContainer extends ScopedLazyContainer {
   public static Create(): LazyContainer {
     return new LazyContainer();
   }
 
-  private readonly _scopes: Scopes<LazyContainer>;
   private readonly _singletonSource: InstanceSource;
   private readonly _creatorSource: CreatorSource;
   private readonly _errorEventHandler: EventHandler<
@@ -87,24 +78,14 @@ export class LazyContainer extends Disposable {
     InstanceEventArgs<unknown>
   >;
 
-  private constructor(private readonly _resolveFromScope?: ResolveFromScope) {
+  protected constructor(private readonly _resolveFromScope?: ResolveFromScope) {
     super();
-    this._scopes = new Scopes(
-      (scopeMode_) =>
-        new LazyContainer(
-          scopeMode_ === 'inherited'
-            ? (identifier_, mode_) =>
-                this.getInstanceResolver(identifier_, mode_)
-            : undefined
-        )
-    );
     this._singletonSource = new Map();
     this._creatorSource = new Map();
     this._errorEventHandler = new EventHandler();
     this._resolvedEventHandler = new EventHandler();
     this._createdEventHandler = new EventHandler();
     this._disposers.push(() => {
-      this._scopes.dispose();
       this._singletonSource.clear();
       this._creatorSource.clear();
       this._errorEventHandler.dispose();
@@ -147,18 +128,6 @@ export class LazyContainer extends Disposable {
    */
   public get onCreated(): Event<this, InstanceEventArgs<unknown>> {
     return this._createdEventHandler.event;
-  }
-
-  /**
-   * create/use a sub container
-   *
-   * @public
-   * @param {PropertyKey} scopeId_
-   * @returns {Scope<LazyContainer>}
-   * @since 1.0.0
-   */
-  public scope(scopeId_: PropertyKey): Scope<LazyContainer> {
-    return this._scopes.get(scopeId_);
   }
 
   /**
@@ -305,7 +274,7 @@ export class LazyContainer extends Disposable {
       return instance;
     }
 
-    this.throwError(
+    this.throwInstanceError(
       identifier_,
       this.resolve.name,
       `"${this.identifierName(identifier_)}" could not be resolved`,
@@ -333,8 +302,8 @@ export class LazyContainer extends Disposable {
       return;
     }
 
-    this._scopes.forEachInstance((_mode, scopedContainer_) =>
-      scopedContainer_.removeSingleton(identifier_, true)
+    this.forEachScopeInstance((instance_) =>
+      instance_.removeSingleton(identifier_, true)
     );
   }
 
@@ -353,9 +322,7 @@ export class LazyContainer extends Disposable {
       return;
     }
 
-    this._scopes.forEachInstance((_mode, scopedContainer_) =>
-      scopedContainer_.clearSingletons(true)
-    );
+    this.forEachScopeInstance((instance_) => instance_.clearSingletons(true));
   }
 
   /**
@@ -374,14 +341,33 @@ export class LazyContainer extends Disposable {
       this.resolve(identifier_, 'singleton');
     });
 
-    this._scopes.forEachInstance((_mode, scopeContainer_) =>
-      scopeContainer_.presolve()
+    this.forEachScopeInstance((instance_) => instance_.presolve());
+  }
+
+  protected createScopeInstance(shape_: LazyContainerShape): this {
+    if (this.constructor !== LazyContainer) {
+      this.throwError(
+        this.createScopeInstance.name,
+        'Class extension detected! Please override createScopeInstance to provide an instance of this extended class'
+      );
+    }
+
+    return new LazyContainer(
+      shape_ === 'inherited'
+        ? (identifier_, mode_) => this.getInstanceResolver(identifier_, mode_)
+        : undefined
+    ) as this;
+  }
+
+  private forEachScopeInstance(callbackFn_: (instance_: this) => void): void {
+    this.scopes.forEach((scope_) =>
+      scope_.instances.forEach((instance_) => callbackFn_(instance_))
     );
   }
 
   private validateKnown<ID extends Identifier>(identifier_: ID): void {
     if (this._creatorSource.has(identifier_)) {
-      this.throwError(
+      this.throwInstanceError(
         identifier_,
         this.validateKnown.name,
         `"${this.identifierName(identifier_)}" already configured`,
@@ -454,13 +440,17 @@ export class LazyContainer extends Disposable {
     ) as ConstructorParameters<C>;
   }
 
-  private throwError(
+  private throwInstanceError(
     identifier_: Identifier,
     origin_: string,
     message_: string,
     kind_: ErrorKind
   ): never {
     this._errorEventHandler.invoke(this, new EventArgs(identifier_, kind_));
+    this.throwError(origin_, message_);
+  }
+
+  private throwError(origin_: string, message_: string): never {
     throw new Error(`[ts-lazy-container/${origin_}]: ${message_}`);
   }
 
@@ -474,3 +464,6 @@ export class LazyContainer extends Disposable {
     return this.isConstructor(value_) || isInjectionKey(value_);
   }
 }
+
+// const c = LazyContainer.Create();
+// const i = c.scope('kjj').inherited
