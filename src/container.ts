@@ -2,10 +2,11 @@ import {
   Event,
   EventArgs,
   EventHandler,
+  ScopedInstanceCore,
   type StandardConstructor
 } from 'ts-lib-extended';
 import { isInjectionKey } from './injectionKey.js';
-import { ScopedLazyContainer, type LazyContainerShape } from './scope.js';
+import { LazyContainerScope, type LazyContainerVariants } from './scope.js';
 import {
   InstanceEventArgs,
   type ConstructableParameters,
@@ -58,7 +59,10 @@ type CreatorSource = {
  * @extends {Disposable}
  * @since 1.0.0
  */
-export class LazyContainer extends ScopedLazyContainer {
+export class LazyContainer extends ScopedInstanceCore<
+  LazyContainer,
+  LazyContainerVariants
+> {
   public static Create(): LazyContainer {
     return new LazyContainer();
   }
@@ -232,13 +236,6 @@ export class LazyContainer extends ScopedLazyContainer {
     );
   }
 
-  private setCreator<T>(
-    identifier_: Identifier<T>,
-    creator_: Creator<T>
-  ): void {
-    this._creatorSource.set(identifier_, creator_);
-  }
-
   /**
    * Resolve an instance using the provided identifier (class or injection key).
    * Suitable instructions must be provided in advance via provide() or instruct().
@@ -344,24 +341,35 @@ export class LazyContainer extends ScopedLazyContainer {
     this.forEachScopeInstance((instance_) => instance_.presolve());
   }
 
-  protected createScopeInstance(shape_: LazyContainerShape): this {
-    if (this.constructor !== LazyContainer) {
-      this.throwError(
-        this.createScopeInstance.name,
-        'Class extension detected! Please override createScopeInstance to provide an instance of this extended class'
-      );
-    }
-
-    return new LazyContainer(
-      shape_ === 'inherited'
-        ? (identifier_, mode_) => this.getInstanceResolver(identifier_, mode_)
-        : undefined
-    ) as this;
+  protected disposeScope(scope_: LazyContainerScope): void {
+    scope_.dispose();
   }
 
-  private forEachScopeInstance(callbackFn_: (instance_: this) => void): void {
+  protected createScope(scopeId_: PropertyKey): LazyContainerScope {
+    return new LazyContainerScope(
+      scopeId_,
+      (variant_) =>
+        new LazyContainer(
+          variant_ === 'inherited'
+            ? (identifier_, mode_) =>
+                this.getInstanceResolver(identifier_, mode_)
+            : undefined
+        )
+    );
+  }
+
+  private setCreator<T>(
+    identifier_: Identifier<T>,
+    creator_: Creator<T>
+  ): void {
+    this._creatorSource.set(identifier_, creator_);
+  }
+
+  private forEachScopeInstance(
+    callbackFn_: (instance_: LazyContainer) => void
+  ): void {
     this.scopes.forEach((scope_) =>
-      scope_.instances.forEach((instance_) => callbackFn_(instance_))
+      scope_.variants.forEach((instance_) => callbackFn_(instance_))
     );
   }
 
@@ -464,6 +472,3 @@ export class LazyContainer extends ScopedLazyContainer {
     return this.isConstructor(value_) || isInjectionKey(value_);
   }
 }
-
-// const c = LazyContainer.Create();
-// const i = c.scope('kjj').inherited

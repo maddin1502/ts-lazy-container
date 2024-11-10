@@ -1,9 +1,9 @@
 import {
   injectionKey,
+  InstanceEventArgs,
   isInjectionKey,
   LazyContainer,
-  LazyContainerScope,
-  ScopedLazyContainer
+  LazyContainerScope
 } from '@/index.js';
 import { describe, expect, it } from 'vitest';
 
@@ -14,6 +14,6 @@ describe('main', () => {
     expect(injectionKey).toBeDefined();
     expect(isInjectionKey).toBeDefined();
     expect(LazyContainerScope).toBeDefined();
-    expect(ScopedLazyContainer).toBeDefined();
+    expect(InstanceEventArgs).toBeDefined();
   });
 });
