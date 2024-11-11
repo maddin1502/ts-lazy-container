@@ -2,7 +2,7 @@ import { type InstanceScope, InstanceScopeCore } from 'ts-lib-extended';
 import type { LazyContainer } from './container.js';
 
 export type LazyContainerVariants = 'inherited' | 'isolated';
-export type CreateScopedInstance<T> = (variant_: LazyContainerVariants) => T;
+export type CreateInstance<T> = (variant_: LazyContainerVariants) => T;
 
 export class LazyContainerScope
   extends InstanceScopeCore<LazyContainer, LazyContainerVariants>
@@ -10,7 +10,7 @@ export class LazyContainerScope
 {
   constructor(
     scopeId_: PropertyKey,
-    private _create: CreateScopedInstance<LazyContainer>
+    private _create: CreateInstance<LazyContainer>
   ) {
     super(scopeId_);
   }

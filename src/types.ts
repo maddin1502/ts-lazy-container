@@ -8,11 +8,9 @@ import type { InjectionKey } from './injectionKey.js';
 export type ResolveMode = 'singleton' | 'unique' | 'deep-unique';
 export type ErrorKind = 'duplicate' | 'missing';
 export type Identifier<T = unknown> = StandardConstructor<T> | InjectionKey<T>;
-export type Instruction<T = unknown> =
-  | Identifier<T>
-  | Creator<T>;
+export type Definition<T = unknown> = Identifier<T> | Resolver<T>;
 
-export type Creator<T = unknown> = (mode_: ResolveMode) => T;
+export type Resolver<T = unknown> = (mode_: ResolveMode) => T;
 export type ConstructableParameters<C extends StandardConstructor> =
   Constructables<ConstructorParameters<C>>;
 
@@ -27,7 +25,7 @@ type ConstructableValue<CPV> = CPV extends MethodLike
   : CPV extends ArrayLike<unknown>
   ? CPV
   : CPV extends object
-  ? StandardConstructor<CPV> | InjectionKey<CPV>
+  ? Identifier<CPV>
   : CPV;
 
 export type ProvisioningParameters<I extends Identifier> = I extends Identifier<

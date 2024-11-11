@@ -53,7 +53,7 @@ describe(LazyContainer, () => {
 
     container.provide(A);
     expect(() => container.provide(A)).toThrow();
-    expect(() => container.instruct(A, () => new A())).toThrow();
+    expect(() => container.define(A, () => new A())).toThrow();
     container.resolve(A).something = '42';
     expect(resolvedCount).toBe(1);
     expect(constructedCount).toBe(1);
@@ -91,9 +91,9 @@ describe(LazyContainer, () => {
 
     container.provide(A);
     const ik = injectionKey<AT>('at key');
-    container.instruct(ik, A);
-    expect(() => container.instruct(ik, A)).toThrow();
-    expect(() => container.instruct(ik, () => new A())).toThrow();
+    container.define(ik, A);
+    expect(() => container.define(ik, A)).toThrow();
+    expect(() => container.define(ik, () => new A())).toThrow();
     container.resolve(ik).something = '42';
     expect(resolvedCount).toBe(2);
     expect(constructedCount).toBe(2);
@@ -288,11 +288,13 @@ describe(LazyContainer, () => {
   });
 
   it('dispose', () => {
-    expect.assertions(13);
+    expect.assertions(15);
     const container = LazyContainer.Create();
     expect(container.isDisposed).toBe(false);
+    expect(container.scope('test').inherited.isDisposed).toBe(false);
     container.dispose();
     expect(container.isDisposed).toBe(true);
+    expect(container.scope('test').inherited.isDisposed).toBe(true);
     expect(() => container.clearSingletons()).toThrow('Instance is disposed!');
     expect(() => container.removeSingleton(A)).toThrow('Instance is disposed!');
     expect(() => container.onError.subscribe('', () => {})).toThrow(
@@ -308,7 +310,7 @@ describe(LazyContainer, () => {
       'Instance is disposed!'
     );
     expect(() => container.scope('').isolated).toThrow('Instance is disposed!');
-    expect(() => container.instruct(A, () => new A())).toThrow(
+    expect(() => container.define(A, () => new A())).toThrow(
       'Instance is disposed!'
     );
     expect(() => container.presolve()).toThrow('Instance is disposed!');
