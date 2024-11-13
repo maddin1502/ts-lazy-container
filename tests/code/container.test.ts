@@ -290,11 +290,12 @@ describe(LazyContainer, () => {
   it('dispose', () => {
     expect.assertions(15);
     const container = LazyContainer.Create();
+    const testScope = container.scope('test').inherited;
     expect(container.isDisposed).toBe(false);
-    expect(container.scope('test').inherited.isDisposed).toBe(false);
+    expect(testScope.isDisposed).toBe(false);
     container.dispose();
     expect(container.isDisposed).toBe(true);
-    expect(container.scope('test').inherited.isDisposed).toBe(true);
+    expect(testScope.isDisposed).toBe(true);
     expect(() => container.clearSingletons()).toThrow('Instance is disposed!');
     expect(() => container.removeSingleton(A)).toThrow('Instance is disposed!');
     expect(() => container.onError.subscribe('', () => {})).toThrow(
@@ -338,7 +339,7 @@ describe(LazyContainer, () => {
   });
 
   it('resolve mode', () => {
-    expect.assertions(6);
+    expect.assertions(12);
     const container = LazyContainer.Create();
 
     container.provide(A);
@@ -355,5 +356,25 @@ describe(LazyContainer, () => {
     expect(c0DoA.a).toBe(c0DoAu.a);
     expect(c0DoA.a).not.toBe(c0DoAdu.a);
     expect(c0DoAu.a).not.toBe(c0DoAdu.a);
+
+    const c0s0DoAu1 = container
+      .scope('scope')
+      .inherited.resolve(DependsOnA, 'unique');
+    const c0s0DoAu2 = container
+      .scope('scope')
+      .inherited.resolve(DependsOnA, 'unique');
+    expect(c0DoA).not.toBe(c0s0DoAu1);
+    expect(c0DoA).not.toBe(c0s0DoAu2);
+    expect(c0s0DoAu1.a).toBe(c0s0DoAu2.a);
+
+    const c0s0DoAdu1 = container
+      .scope('scope')
+      .inherited.resolve(DependsOnA, 'deep-unique');
+    const c0s0DoAdu2 = container
+      .scope('scope')
+      .inherited.resolve(DependsOnA, 'deep-unique');
+    expect(c0DoA).not.toBe(c0s0DoAdu1);
+    expect(c0DoA).not.toBe(c0s0DoAdu2);
+    expect(c0s0DoAdu1.a).not.toBe(c0s0DoAdu2.a);
   });
 });

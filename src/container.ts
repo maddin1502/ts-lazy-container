@@ -50,7 +50,7 @@ type ResolverSource = {
 };
 
 /**
- * This tool controls the creation and distribution of application-wide object instances.
+ * This tool manages the creation and distribution of application-wide instances.
  * These are created as singletons or unique variants as needed from provided definitions.
  * In addition, scopes can be used to refine the distribution
  *
@@ -440,11 +440,11 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     parameters_: ConstructableParameters<C>,
     mode_: ResolveMode
   ): ConstructorParameters<C> {
-    return parameters_.map((parameter_) =>
-      this.isIdentifier(parameter_)
-        ? this.resolve(parameter_, mode_ === 'unique' ? 'singleton' : mode_)
-        : parameter_
-    ) as ConstructorParameters<C>;
+    return parameters_.map((parameter_) => {
+      return this.isIdentifier(parameter_)
+        ? this.resolve(parameter_, mode_)
+        : parameter_;
+    }) as ConstructorParameters<C>;
   }
 
   private throwInstanceError(
