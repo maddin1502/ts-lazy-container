@@ -10,7 +10,7 @@ const container = LazyContainer.Create();
 container.provideClass(A);
 container.provideClass(B, A, 'hello world');
 
-const b = container.resolve(B);
+const b = container.inject(B);
 
 describe(LazyContainer, () => {
   test('provide', () => {

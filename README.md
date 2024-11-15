@@ -19,24 +19,35 @@
 npm i ts-lazy-container
 ```
 
-## Basics
-
-TODO:
-- laziness
-
 ## Usage
+
+LazyContainer is lazy by design (as the name suggests). Instances will be created on demand during injection. For this to work, types, interfaces or classes must be registered to the container via creation instructions.
+
+### Injection Modes
+
+- singleton: created instance will be cached and reused on further injections. Dependencies (e.g. constructor parameters) are resolved in 'singleton' mode, too
+- unique: creates a unique instance on each injection. Dependencies (e.g. constructor parameters) are resolved in 'singleton' mode and are therefore NOT unique
+- deep-unique: creates a unique instance on each injection. Dependencies (e.g. constructor parameters) are resolved in 'deep-unique' mode and are therefore also unique
+
+### Register creation instructions
 
 > Identifier = `Class` or `InjectionKey`
 
-Use `provide()` and/or `provideClass()` to register instance creation instructions.
-- With `provide` it is possible to register any Types, Interfaces or Classes by using `injection keys` as `identifiers`. You can also register Classes without an `injection key`, just use the Class itself as `identifier`. You must specify an additional callback function that creates an instance (must match the identifier type).
-- `provideClass` is specialized on class based registrations, it determines required constructor parameters that must be provided as well. Object-based constructor parameters do not require concrete instances but must be configured via `identifiers`. The container resolves these identifiers automatically, so they must also be provided in the container via `provide` or `provideClass`.
+Use `provide()` and/or `provideClass()` to register creation instructions.
+- With `provide` it is possible to register any Type, Interface or Class by using an `InjectionKey` as `identifier`. You can also register Classes without an `InjectionKey`, just use the `Class` itself as `identifier`. You must specify an additional callback function that creates an instance (must match the identifier type).
+- `provideClass` is specialized on class based registrations, it determines required constructor parameters that must be provided as well. Object-based constructor parameters do not require concrete instances but must be configured via `identifiers`. The container automatically resolves these `identifiers` when `inject()` is used to gain an instance (lazy), so they must also be registered in the container via `provide` or `provideClass`.
 
-`Identifiers` can only be registered once. A duplicate registration leads to an error. If multiple instances of a type are required, different `InjectionKeys` of the same type must be created.
+> `Identifiers` can only be registered once. Duplicate registration will result in an error. If multiple instances of a type are needed, different `InjectionKeys` of the same type must be created.
+
+### Scoping
+
+TODO:
+inherited
+isolated
 
 ### Application Examples
 
-Example types and classes for all variants
+Example types and classes for all example variants
 
 ```ts
 type TypedA = {
@@ -60,36 +71,144 @@ class DependsOnA {
 
 #### Variant 1
 
+Register a class that depends on another (using `provideClass`)
+
 ```ts
 import { LazyContainer } from 'ts-lazy-container';
+
+const container = LazyContainer.Create();
+container.provideClass(A, 'hello world', true, () => {});
+container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+
+// ...
+
+const a = container.inject(A);
+// => { text: 'hello world'; flag: true; callback: () => {} }
+const doa = container.inject(DependsOnA);
+// => { a: { text: 'hello world'; flag: true; callback: () => {} }; list: [1, 2, 3, 42] }
 ```
 
 #### Variant 2
 
+Mixed usage of `provide` and `provideClass` for class registration
+
 ```ts
-import { injectionKey, LazyContainer } from 'ts-lazy-container';
+import { LazyContainer } from 'ts-lazy-container';
+const container = LazyContainer.Create();
+container.provide(A, () => new A('hello world', true, () => {}));
+container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+
+// ...
+
+const a = container.inject(A);
+// => { text: 'hello world'; flag: true; callback: () => {} }
+const doa = container.inject(DependsOnA);
+// => { a: { text: 'hello world'; flag: true; callback: () => {} }; list: [1, 2, 3, 42] }
 ```
 
 #### Variant 3
 
+Use `InjectionKeys` to register/inject types or interface
+
 ```ts
 import { injectionKey, LazyContainer } from 'ts-lazy-container';
+
+const aInjectionKey = injectionKey<TypedA>();
+
+const container = LazyContainer.Create();
+container.provide(
+  aInjectionKey,
+  () => new A('hello world', true, () => {})
+);
+container.provideClass(DependsOnA, aInjectionKey, [1, 2, 3, 42]);
+
+// ...
+
+const a = container.inject(aInjectionKey); // a: TypedA
+// => { text: 'hello world'; flag: true; callback: () => {} }
+const doa = container.inject(DependsOnA);
+// => { a: { text: 'hello world'; flag: true; callback: () => {} }; list: [1, 2, 3, 42] }
 ```
 
 #### Variant 4
 
+Use `InjectionKeys` to register/inject types or interface using anonymous object
+
 ```ts
 import { injectionKey, LazyContainer } from 'ts-lazy-container';
+
+const aInjectionKey = injectionKey<TypedA>();
+
+const container = LazyContainer.Create();
+container.provide(aInjectionKey, () => ({
+  text: 'hello world',
+  flag: true,
+  callback: () => {}
+}));
+container.provideClass(DependsOnA, aInjectionKey, [1, 2, 3, 42]);
+
+// ...
+
+const a = container.inject(aInjectionKey); // a: TypedA
+// => { text: 'hello world'; flag: true; callback: () => {} }
+const doa = container.inject(DependsOnA);
+// => { a: { text: 'hello world'; flag: true; callback: () => {} }; list: [1, 2, 3, 42] }
 ```
 
 #### Variant 5
 
+Mix it all up!
+- use a `class` as creation instruction for an `InjectionsKey`
+- use different `InjectionKeys` to register multiple creation instructions of the same type/interface/class
+
 ```ts
 import { injectionKey, LazyContainer } from 'ts-lazy-container';
+
+const doa1InjectionKey = injectionKey<DependsOnA>();
+const doa2InjectionKey = injectionKey<DependsOnA>();
+
+const container = LazyContainer.Create();
+container.provideClass(A, 'hello world', true, () => {});
+container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+container.provide(doa1InjectionKey, DependsOnA);
+container.provide(
+  doa2InjectionKey,
+  () => new DependsOnA(container.inject(A), [5, 6, 7])
+);
+
+// ...
+
+const doa1 = container.inject(doa1InjectionKey);
+// doa1.list => [1, 2, 3, 42]
+const doa2 = container.inject(doa2InjectionKey);
+// doa2.list => [5, 6, 7]
 ```
 
+#### Variant 6
 
-### Resolution / Injection
+Inject unique instances
+
+```ts
+import { LazyContainer } from 'ts-lazy-container';
+
+const container = LazyContainer.Create();
+container.provideClass(A, 'hello world', true, () => {});
+container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+
+// ...
+
+const doa1 = container.inject(DependsOnA); // defaults to 'singleton'
+const doa2 = container.inject(DependsOnA, 'singleton');
+const doa3 = container.inject(DependsOnA, 'unique');
+const doa4 = container.inject(DependsOnA, 'deep-unique');
+
+// doa1 === doa2      => true
+// doa1 === doa3      => false
+// doa1 === doa4      => false
+// doa1.a === doa2.a  => true
+// doa1.a === doa3.a  => true
+// doa1.a === doa4.a  => false
+```
 
 ### Scoping
 ...

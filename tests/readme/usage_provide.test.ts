@@ -27,9 +27,9 @@ describe('usage_provide', () => {
     container.provideClass(A, 'hello world', true, () => {});
     container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
 
-    const a = container.resolve(A);
+    const a = container.inject(A);
     // => { text: 'hello world'; flag: true; callback: () => {} }
-    const doa = container.resolve(DependsOnA);
+    const doa = container.inject(DependsOnA);
     // => { a: { text: 'hello world'; flag: true; callback: () => {} }; list: [1, 2, 3, 42] }
     expect(doa.a).toBe(a);
   });
@@ -40,9 +40,9 @@ describe('usage_provide', () => {
     container.provide(A, () => new A('hello world', true, () => {}));
     container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
 
-    const a = container.resolve(A);
+    const a = container.inject(A);
     // => { text: 'hello world'; flag: true; callback: () => {} }
-    const doa = container.resolve(DependsOnA);
+    const doa = container.inject(DependsOnA);
     // => { a: { text: 'hello world'; flag: true; callback: () => {} }; list: [1, 2, 3, 42] }
     expect(doa.a).toBe(a);
   });
@@ -57,9 +57,9 @@ describe('usage_provide', () => {
     );
     container.provideClass(DependsOnA, aInjectionKey, [1, 2, 3, 42]);
 
-    const a = container.resolve(aInjectionKey);
+    const a = container.inject(aInjectionKey); // a: TypedA
     // => { text: 'hello world'; flag: true; callback: () => {} }
-    const doa = container.resolve(DependsOnA);
+    const doa = container.inject(DependsOnA);
     // => { a: { text: 'hello world'; flag: true; callback: () => {} }; list: [1, 2, 3, 42] }
     expect(doa.a).toBe(a);
   });
@@ -75,9 +75,9 @@ describe('usage_provide', () => {
     }));
     container.provideClass(DependsOnA, aInjectionKey, [1, 2, 3, 42]);
 
-    const a = container.resolve(aInjectionKey);
+    const a = container.inject(aInjectionKey); // a: TypedA
     // => { text: 'hello world'; flag: true; callback: () => {} }
-    const doa = container.resolve(DependsOnA);
+    const doa = container.inject(DependsOnA);
     // => { a: { text: 'hello world'; flag: true; callback: () => {} }; list: [1, 2, 3, 42] }
     expect(doa.a).toBe(a);
   });
@@ -92,14 +92,40 @@ describe('usage_provide', () => {
     container.provide(doa1InjectionKey, DependsOnA);
     container.provide(
       doa2InjectionKey,
-      () => new DependsOnA(container.resolve(A), [5, 6, 7])
+      () => new DependsOnA(container.inject(A), [5, 6, 7])
     );
 
-    const doa1 = container.resolve(doa1InjectionKey);
+    const doa1 = container.inject(doa1InjectionKey);
     // doa1.list => [1, 2, 3, 42]
-    const doa2 = container.resolve(doa2InjectionKey);
+    const doa2 = container.inject(doa2InjectionKey);
     // doa2.list => [5, 6, 7]
     expect(doa1).not.toBe(doa2);
     expect(doa1.a).toBe(doa2.a);
+  });
+  test('V6', () => {
+    expect.assertions(6);
+    const container = LazyContainer.Create();
+
+    container.provideClass(A, 'hello world', true, () => {});
+    container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+
+    const doa1 = container.inject(DependsOnA); // defaults to 'singleton'
+    const doa2 = container.inject(DependsOnA, 'singleton');
+    const doa3 = container.inject(DependsOnA, 'unique');
+    const doa4 = container.inject(DependsOnA, 'deep-unique');
+
+    // doa1 === doa2      => true
+    // doa1 === doa3      => false
+    // doa1 === doa4      => false
+    // doa1.a === doa2.a  => true
+    // doa1.a === doa3.a  => true
+    // doa1.a === doa4.a  => false
+
+    expect(doa1).toBe(doa2);
+    expect(doa1).not.toBe(doa3);
+    expect(doa1).not.toBe(doa4);
+    expect(doa1.a).toBe(doa2.a);
+    expect(doa1.a).toBe(doa3.a);
+    expect(doa1.a).not.toBe(doa4.a);
   });
 });

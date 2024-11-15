@@ -156,7 +156,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
    *
    * ...
    *
-   * const b = container.resolve(B);
+   * const b = container.inject(B);
    * ```
    *
    * @public
@@ -209,10 +209,10 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
    *
    * ...
    *
-   * const aik: AType = container.resolve(aInjectionKey); // value = hi
-   * const a1: AType = container.resolve(A1); // value = hello
-   * const a2: AType = container.resolve(A2); // value = greeting
-   * const aik2: AType = container.resolve(aInjectionKey2); // value = greeting
+   * const aik: AType = container.inject(aInjectionKey); // value = hi
+   * const a1: AType = container.inject(A1); // value = hello
+   * const a2: AType = container.inject(A2); // value = greeting
+   * const aik2: AType = container.inject(aInjectionKey2); // value = greeting
    * ```
    *
    * @public
@@ -232,16 +232,16 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     this.setResolver(
       identifier_,
       this.isIdentifier(definition_)
-        ? (mode_) => this.resolve(definition_, mode_)
+        ? (mode_) => this.inject(definition_, mode_)
         : definition_
     );
   }
 
   /**
-   * Resolve an instance. Suitable definitions must be provided in advance via provide() or provideClass().
+   * Inject/Resolve an instance. Suitable definitions must be provided in advance via provide() or provideClass().
    *
    * ResolveMode:
-   * - singleton: created instance will be cached and reused when resolved later; dependencies/constructor-parameters are resolved in 'singleton' mode
+   * - singleton: created instance will be cached and reused on further injections; dependencies/constructor-parameters are resolved in 'singleton' mode
    * - unique: creates a new instance each time; dependencies/constructor-parameters are resolved in 'singleton' mode
    * - deep-unique: creates a new instance each time; dependencies/constructor-parameters are resolved in 'deep-unique' mode and are therefore also unique
    *
@@ -253,7 +253,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
    * @throws {Error} when no definition is provided
    * @since 1.0.0
    */
-  public resolve<T>(
+  public inject<T>(
     identifier_: Identifier<T>,
     mode_: ResolveMode = 'singleton'
   ): T {
@@ -272,7 +272,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
 
     this.throwInstanceError(
       identifier_,
-      this.resolve.name,
+      this.inject.name,
       `"${this.identifierName(identifier_)}" could not be resolved`,
       'missing'
     );
@@ -334,7 +334,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     this.validateDisposed(this);
 
     this._resolverSource.forEach((_, identifier_) =>
-      this.resolve(identifier_, 'singleton')
+      this.inject(identifier_, 'singleton')
     );
 
     this.forEachScopeInstance((instance_) => instance_.presolve());
@@ -442,7 +442,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
   ): ConstructorParameters<C> {
     return parameters_.map((parameter_) => {
       return this.isIdentifier(parameter_)
-        ? this.resolve(parameter_, mode_)
+        ? this.inject(parameter_, mode_)
         : parameter_;
     }) as ConstructorParameters<C>;
   }

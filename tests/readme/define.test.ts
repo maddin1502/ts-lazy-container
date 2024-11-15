@@ -19,10 +19,10 @@ container.provide(A1, () => new A1('hello'));
 container.provideClass(A2, 'greetings');
 container.provide(aInjectionKey2, A2);
 
-const aik: AType = container.resolve(aInjectionKey); // value = hi
-const a1: AType = container.resolve(A1); // value = hello
-const a2: AType = container.resolve(A2); // value = greeting
-const aik2: AType = container.resolve(aInjectionKey2); // value = greeting
+const aik: AType = container.inject(aInjectionKey); // value = hi
+const a1: AType = container.inject(A1); // value = hello
+const a2: AType = container.inject(A2); // value = greeting
+const aik2: AType = container.inject(aInjectionKey2); // value = greeting
 
 describe(LazyContainer, () => {
   test('provide', () => {
