@@ -10,9 +10,9 @@ import { LazyContainerScope } from './scope.js';
 import {
   InstanceEventArgs,
   type ConstructableParameters,
-  type Definition,
   type ErrorKind,
   type Identifier,
+  type IdentifierDefinition,
   type ResolveMode,
   type Resolver
 } from './types.js';
@@ -137,7 +137,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
    * Required parameters are determined via the class constructor and must be specified in the correct order.
    * Simple parameters (primitive values, arrays, functions) can be passed directly.
    * Object-like parameters (interfaces, record types, anonymous objects) must be provided via a matching identifier (class or injection key - NOT an instance).
-   * These parameter identifiers are resolved internally; this is only possible if their instance creation definitions are also specified by provide() of define().
+   * These parameter identifiers are resolved internally; this is only possible if their instance creation definitions are also specified by provide() of provideClass().
    *
    * ```ts
    * import { LazyContainer } from 'ts-lazy-container'
@@ -163,10 +163,10 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
    * @template {StandardConstructor} C
    * @param {C} constructor_ Class itself, NOT an instance
    * @param {...ConstructableParameters<C>} parameters_
-   * @throws {Error} when already provided or defined (duplicate)
+   * @throws {Error} when already provided (duplicate)
    * @since 1.0.0
    */
-  public provide<C extends StandardConstructor>(
+  public provideClass<C extends StandardConstructor>(
     constructor_: C,
     ...parameters_: ConstructableParameters<C>
   ): void {
@@ -202,10 +202,10 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
    * const container = LazyContainer.Create();
    * const aInjectionKey = injectionKey<AType>();
    * const aInjectionKey2 = injectionKey<AType>();
-   * container.define(aInjectionKey, () => ({value: 'hi'}))
-   * container.define(A1, () => new A1('hello'))
+   * container.provide(aInjectionKey, () => ({value: 'hi'}))
+   * container.provide(A1, () => new A1('hello'))
    * container.provide(A2, 'greetings')
-   * container.define(aInjectionKey2, A2)
+   * container.provide(aInjectionKey2, A2)
    *
    * ...
    *
@@ -216,15 +216,15 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
    * ```
    *
    * @public
-   * @template T
-   * @param {Identifier<T>} identifier_ Identifier (class or injection key) that refers to the type to be provided/registered
-   * @param {Definition<T>} definition_  Definition: Identifier (class or injection key) that refers to a type that is assignable to the target type; or an instance creation callback
-   * @throws {Error} when already defined or provided (duplicate)
+   * @template {Identifier} I
+   * @param {I} identifier_ Identifier (class or injection key) that refers to the type to be provided/registered
+   * @param {IdentifierDefinition<I>} definition_ definition_  Definition: Identifier (class or injection key) that refers to a type that is assignable to the target type; or an instance creation callback
+   * @throws {Error} when already provided (duplicate)
    * @since 1.0.0
    */
-  public define<T>(
-    identifier_: Identifier<T>,
-    definition_: Definition<T>
+  public provide<I extends Identifier>(
+    identifier_: I,
+    definition_: IdentifierDefinition<I>
   ): void {
     this.validateDisposed(this);
     this.validateKnown(identifier_);
@@ -238,7 +238,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
   }
 
   /**
-   * Resolve an instance. Suitable definitions must be provided in advance via provide() or define().
+   * Resolve an instance. Suitable definitions must be provided in advance via provide() or provideClass().
    *
    * ResolveMode:
    * - singleton: created instance will be cached and reused when resolved later; dependencies/constructor-parameters are resolved in 'singleton' mode

@@ -7,8 +7,8 @@ class B {
 }
 
 const container = LazyContainer.Create();
-container.provide(A);
-container.provide(B, A, 'hello world');
+container.provideClass(A);
+container.provideClass(B, A, 'hello world');
 
 const b = container.resolve(B);
 

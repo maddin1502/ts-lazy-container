@@ -1,9 +1,24 @@
 const INJECTION_KEY_IDENTIFIER = Symbol();
 
-export type InjectionKeyId<T> = symbol & NonNullable<Omit<T, keyof T>>; // added "magic" that keeps it generic, otherwise T will be lost and InjectionKey<T> resolves to "symbol"
 export type InjectionKey<T = unknown> = {
-  readonly [INJECTION_KEY_IDENTIFIER]: true;
-  readonly id: InjectionKeyId<T>;
+  /**
+   * locked marker for injection key identification
+   * required for typescript to keep the injection key type info
+   * is ALWAYS undefined
+   *
+   * @readonly
+   * @type {?T}
+   * @since 1.0.0
+   */
+  readonly [INJECTION_KEY_IDENTIFIER]?: T;
+  /**
+   * unique identifier to differ injections keys from each other
+   *
+   * @readonly
+   * @type {symbol}
+   * @since 1.0.0
+   */
+  readonly id: symbol;
 };
 
 /**
@@ -17,8 +32,8 @@ export type InjectionKey<T = unknown> = {
  */
 export function injectionKey<T>(name_?: string): InjectionKey<T> {
   return {
-    id: Symbol(name_ ?? 'unnamed') as InjectionKeyId<T>,
-    [INJECTION_KEY_IDENTIFIER]: true
+    id: Symbol(name_ ?? 'unnamed'),
+    [INJECTION_KEY_IDENTIFIER]: undefined
   };
 }
 
@@ -31,6 +46,6 @@ export function isInjectionKey<T = unknown>(
     'id' in value_ &&
     INJECTION_KEY_IDENTIFIER in value_ &&
     typeof value_.id === 'symbol' &&
-    value_[INJECTION_KEY_IDENTIFIER] === true
+    value_[INJECTION_KEY_IDENTIFIER] === undefined
   );
 }

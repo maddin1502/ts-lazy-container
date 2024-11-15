@@ -14,10 +14,10 @@ class A2 extends A1 {}
 const container = LazyContainer.Create();
 const aInjectionKey = injectionKey<AType>();
 const aInjectionKey2 = injectionKey<AType>();
-container.define(aInjectionKey, () => ({ value: 'hi' }));
-container.define(A1, () => new A1('hello'));
-container.provide(A2, 'greetings');
-container.define(aInjectionKey2, A2);
+container.provide(aInjectionKey, () => ({ value: 'hi' }));
+container.provide(A1, () => new A1('hello'));
+container.provideClass(A2, 'greetings');
+container.provide(aInjectionKey2, A2);
 
 const aik: AType = container.resolve(aInjectionKey); // value = hi
 const a1: AType = container.resolve(A1); // value = hello

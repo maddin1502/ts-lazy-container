@@ -51,9 +51,9 @@ describe(LazyContainer, () => {
     container.onResolved.subscribe('resolved', () => resolvedCount++);
     container.onCreated.subscribe('constructed', () => constructedCount++);
 
-    container.provide(A);
-    expect(() => container.provide(A)).toThrow();
-    expect(() => container.define(A, () => new A())).toThrow();
+    container.provideClass(A);
+    expect(() => container.provideClass(A)).toThrow();
+    expect(() => container.provide(A, () => new A())).toThrow();
     container.resolve(A).something = '42';
     expect(resolvedCount).toBe(1);
     expect(constructedCount).toBe(1);
@@ -61,7 +61,7 @@ describe(LazyContainer, () => {
     expect(container.resolve(A).something).toBe('42');
     expect(resolvedCount).toBe(2);
     expect(constructedCount).toBe(1);
-    container.provide(DependsOnA, A);
+    container.provideClass(DependsOnA, A);
     container.resolve(DependsOnA).a.something = '24';
     expect(resolvedCount).toBe(4);
     expect(constructedCount).toBe(2);
@@ -70,10 +70,10 @@ describe(LazyContainer, () => {
     expect(resolvedCount).toBe(5);
     expect(constructedCount).toBe(2);
     expect(errorCount).toBe(3);
-    container.provide(WithSimpleParams, B, 42, [42, 42], () => 84);
+    container.provideClass(WithSimpleParams, B, 42, [42, 42], () => 84);
     expect(() => container.resolve(WithSimpleParams)).toThrow();
     expect(errorCount).toBe(4);
-    container.provide(B);
+    container.provideClass(B);
     expect(container.resolve(WithSimpleParams).valueParam).toBe(42);
     expect(resolvedCount).toBe(7);
     expect(constructedCount).toBe(4);
@@ -89,11 +89,11 @@ describe(LazyContainer, () => {
     container.onResolved.subscribe('resolved', () => resolvedCount++);
     container.onCreated.subscribe('constructed', () => constructedCount++);
 
-    container.provide(A);
+    container.provideClass(A);
     const ik = injectionKey<AT>('at key');
-    container.define(ik, A);
-    expect(() => container.define(ik, A)).toThrow();
-    expect(() => container.define(ik, () => new A())).toThrow();
+    container.provide(ik, A);
+    expect(() => container.provide(ik, A)).toThrow();
+    expect(() => container.provide(ik, () => new A())).toThrow();
     container.resolve(ik).something = '42';
     expect(resolvedCount).toBe(2);
     expect(constructedCount).toBe(2);
@@ -101,7 +101,7 @@ describe(LazyContainer, () => {
     expect(container.resolve(ik).something).toBe('42');
     expect(resolvedCount).toBe(3);
     expect(constructedCount).toBe(2);
-    container.provide(DependsOnA, ik);
+    container.provideClass(DependsOnA, ik);
     container.resolve(DependsOnA).a.something = '24';
     expect(resolvedCount).toBe(5);
     expect(constructedCount).toBe(3);
@@ -118,12 +118,12 @@ describe(LazyContainer, () => {
     container.onResolved.subscribe('resolved', () => resolvedCount++);
     container.onCreated.subscribe('constructed', () => constructedCount++);
 
-    container.provide(DependsOnA, A);
+    container.provideClass(DependsOnA, A);
     expect(() => container.presolve()).toThrow();
     expect(resolvedCount).toBe(0);
     expect(constructedCount).toBe(0);
     expect(errorCount).toBe(1);
-    container.provide(A);
+    container.provideClass(A);
     container.presolve();
     expect(resolvedCount).toBe(3);
     expect(constructedCount).toBe(2);
@@ -132,12 +132,12 @@ describe(LazyContainer, () => {
     expect(resolvedCount).toBe(5);
     expect(constructedCount).toBe(2);
     expect(errorCount).toBe(1);
-    container.provide(WithSimpleParams, B, 42, [42, 42], () => 84);
+    container.provideClass(WithSimpleParams, B, 42, [42, 42], () => 84);
     expect(() => container.presolve()).toThrow();
     // expect(resolvedCount).toBe(2);
     expect(constructedCount).toBe(2);
     expect(errorCount).toBe(2);
-    container.provide(B);
+    container.provideClass(B);
     container.presolve();
     // expect(resolvedCount).toBe(4);
     expect(constructedCount).toBe(4);
@@ -154,21 +154,21 @@ describe(LazyContainer, () => {
     container.onResolved.subscribe('resolved', () => resolvedCount++);
     container.onCreated.subscribe('constructed', () => constructedCount++);
 
-    container.provide(B);
-    container.provide(WithSimpleParams, B, 42, [42, 42], () => 84);
+    container.provideClass(B);
+    container.provideClass(WithSimpleParams, B, 42, [42, 42], () => 84);
     expect(container.resolve(WithSimpleParams).valueParam).toBe(42);
     expect(container.resolve(WithSimpleParams).arrayParam).toEqual([42, 42]);
     expect(container.resolve(WithSimpleParams).functionParam()).toBe(84);
     expect(() =>
       container.scope(1).isolated.resolve(WithSimpleParams)
     ).toThrow();
-    container.scope(1).isolated.provide(B);
+    container.scope(1).isolated.provideClass(B);
     expect(() =>
       container.scope(1).isolated.resolve(WithSimpleParams)
     ).toThrow();
     container
       .scope(1)
-      .isolated.provide(WithSimpleParams, B, 4242, [4242, 4242], () => 8484);
+      .isolated.provideClass(WithSimpleParams, B, 4242, [4242, 4242], () => 8484);
     expect(container.resolve(WithSimpleParams).valueParam).toBe(42);
     expect(container.resolve(WithSimpleParams).arrayParam).toEqual([42, 42]);
     expect(container.resolve(WithSimpleParams).functionParam()).toBe(84);
@@ -185,14 +185,14 @@ describe(LazyContainer, () => {
     expect(() =>
       container.scope(1).isolated.scope(1).isolated.resolve(WithSimpleParams)
     );
-    container.scope(1).isolated.scope(1).isolated.provide(B);
+    container.scope(1).isolated.scope(1).isolated.provideClass(B);
     expect(() =>
       container.scope(1).isolated.scope(1).isolated.resolve(WithSimpleParams)
     );
     container
       .scope(1)
       .isolated.scope(1)
-      .isolated.provide(
+      .isolated.provideClass(
         WithSimpleParams,
         B,
         424242,
@@ -241,11 +241,11 @@ describe(LazyContainer, () => {
     expect(() =>
       container.scope(1).inherited.resolve(WithSimpleParams)
     ).toThrow();
-    container.provide(B);
+    container.provideClass(B);
     expect(() =>
       container.scope(1).inherited.resolve(WithSimpleParams)
     ).toThrow();
-    container.provide(WithSimpleParams, B, 42, [42, 42], () => 84);
+    container.provideClass(WithSimpleParams, B, 42, [42, 42], () => 84);
     const c0 = container.resolve(WithSimpleParams);
     const c1 = container.scope(1).inherited.resolve(WithSimpleParams);
     expect(c0).toBe(c1); // both got resolved from root container
@@ -255,7 +255,7 @@ describe(LazyContainer, () => {
     expect(c1.functionParam()).toBe(84);
     container
       .scope(1)
-      .inherited.provide(WithSimpleParams, B, 4242, [4242, 4242], () => 8484);
+      .inherited.provideClass(WithSimpleParams, B, 4242, [4242, 4242], () => 8484);
 
     const c0v2 = container.resolve(WithSimpleParams);
     const c1v2 = container.scope(1).inherited.resolve(WithSimpleParams);
@@ -265,7 +265,7 @@ describe(LazyContainer, () => {
     expect(c1v2.arrayParam).toEqual([4242, 4242]);
     expect(c1v2.functionParam()).toBe(8484);
 
-    container.scope(1).inherited.provide(B);
+    container.scope(1).inherited.provideClass(B);
 
     const c0v3 = container.resolve(WithSimpleParams);
     const c1v3 = container.scope(1).inherited.resolve(WithSimpleParams);
@@ -311,20 +311,20 @@ describe(LazyContainer, () => {
       'Instance is disposed!'
     );
     expect(() => container.scope('').isolated).toThrow('Instance is disposed!');
-    expect(() => container.define(A, () => new A())).toThrow(
+    expect(() => container.provide(A, () => new A())).toThrow(
       'Instance is disposed!'
     );
     expect(() => container.presolve()).toThrow('Instance is disposed!');
-    expect(() => container.provide(A)).toThrow('Instance is disposed!');
+    expect(() => container.provideClass(A)).toThrow('Instance is disposed!');
     expect(() => container.resolve(A)).toThrow('Instance is disposed!');
   });
 
   it('clearSingletons', () => {
     expect.assertions(6);
     const container = LazyContainer.Create();
-    container.provide(A);
-    container.scope(1).isolated.provide(A);
-    container.scope(1).inherited.provide(A);
+    container.provideClass(A);
+    container.scope(1).isolated.provideClass(A);
+    container.scope(1).inherited.provideClass(A);
     const c0A = container.resolve(A);
     const c1IsoA = container.scope(1).isolated.resolve(A);
     const c1InhA = container.scope(1).inherited.resolve(A);
@@ -342,8 +342,8 @@ describe(LazyContainer, () => {
     expect.assertions(12);
     const container = LazyContainer.Create();
 
-    container.provide(A);
-    container.provide(DependsOnA, A);
+    container.provideClass(A);
+    container.provideClass(DependsOnA, A);
 
     const c0DoA = container.resolve(DependsOnA);
     const c0DoAu = container.resolve(DependsOnA, 'unique');
