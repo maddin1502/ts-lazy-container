@@ -5,7 +5,7 @@ import {
 } from 'ts-lib-extended';
 import type { InjectionKey } from './injectionKey.js';
 
-export type ResolveMode = 'singleton' | 'unique' | 'deep-unique';
+export type InjectionMode = 'singleton' | 'unique' | 'deep-unique';
 export type ErrorKind = 'duplicate' | 'missing';
 export type Identifier<T = unknown> = StandardConstructor<T> | InjectionKey<T>;
 export type Definition<T> = Identifier<T> | Resolver<T>;
@@ -15,7 +15,7 @@ export type IdentifierDefinition<I extends Identifier> = I extends Identifier<
   ? Definition<T>
   : never;
 
-export type Resolver<T = unknown> = (mode_: ResolveMode) => T;
+export type Resolver<T = unknown> = (mode_: InjectionMode) => T;
 export type ConstructableParameters<C extends StandardConstructor> =
   Constructables<ConstructorParameters<C>>;
 

@@ -41,6 +41,9 @@ Use `provide()` and/or `provideClass()` to register creation instructions.
 
 ### Scoping
 
+Scopes allow you to create tree structures within containers. This makes it possible to inject unique instances for specific use cases. These scopes can be created isolated or inherited. A scope is also just a container, so a scope can be created within a scope (and so on...).
+- isolated: An isolated scope
+
 TODO:
 inherited
 isolated
@@ -108,7 +111,7 @@ const doa = container.inject(DependsOnA);
 
 #### Variant 3
 
-Use `InjectionKeys` to register/inject types or interface
+Use `InjectionKeys` to register/inject types or interfaces
 
 ```ts
 import { injectionKey, LazyContainer } from 'ts-lazy-container';
@@ -132,7 +135,7 @@ const doa = container.inject(DependsOnA);
 
 #### Variant 4
 
-Use `InjectionKeys` to register/inject types or interface using anonymous object
+Use `InjectionKeys` to register/inject types or interfaces using anonymous objects
 
 ```ts
 import { injectionKey, LazyContainer } from 'ts-lazy-container';
@@ -186,7 +189,7 @@ const doa2 = container.inject(doa2InjectionKey);
 
 #### Variant 6
 
-Inject unique instances
+Inject unique instances - use the correct mode
 
 ```ts
 import { LazyContainer } from 'ts-lazy-container';
@@ -210,5 +213,45 @@ const doa4 = container.inject(DependsOnA, 'deep-unique');
 // doa1.a === doa4.a  => false
 ```
 
-### Scoping
+#### Variant 7
+
+Using scopes for unique or use case related instances.
+
+```ts
+import { LazyContainer } from 'ts-lazy-container';
+
+class User {
+  constructor(public name: string, public doa: DependsOnA) {}
+}
+
+const container = LazyContainer.Create();
+
+container.provideClass(A, 'hello world', true, () => {});
+container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+container.provideClass(User, 'Jack', DependsOnA);
+
+const scientistScope = container.scope('scientist').inherited; // can resolve any instance from parent scope
+scientistScope.provideClass(User, 'Daniel', DependsOnA);
+
+const alienScope = container.scope('alien').isolated; // NO access to parent; need to register dependencies again
+alienScope.provideClass(A, 'hello Chulak', false, () => {});
+alienScope.provideClass(DependsOnA, A, []);
+alienScope.provideClass(User, "Teal'c", DependsOnA);
+
+const jack = container.inject(User);
+const daniel = scientistScope.inject(User);
+const tealc = alienScope.inject(User);
+
+// jack === daniel              => false
+// jack === tealc               => false
+// jack.name                    => Jack
+// daniel.name                  => Daniel
+// tealc.name                   => Teal'c
+// jack.doa === daniel.doa      => true
+// jack.doa === tealc.doa       => false
+// jack.doa.a.text              => hello world
+// daniel.doa.a.text            => hello world
+// tealc.doa.a.text             => hello Chulak
+```
+
 ...

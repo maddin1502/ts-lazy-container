@@ -128,4 +128,51 @@ describe('usage_provide', () => {
     expect(doa1.a).toBe(doa3.a);
     expect(doa1.a).not.toBe(doa4.a);
   });
+  test('V7', () => {
+    expect.assertions(10);
+
+    class User {
+      constructor(public name: string, public doa: DependsOnA) {}
+    }
+
+    const container = LazyContainer.Create();
+
+    container.provideClass(A, 'hello world', true, () => {});
+    container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+    container.provideClass(User, 'Jack', DependsOnA);
+
+    const scientistScope = container.scope('scientist').inherited; // can resolve any instance from parent scope
+    scientistScope.provideClass(User, 'Daniel', DependsOnA);
+
+    const alienScope = container.scope('alien').isolated; // NO access to parent; need to register dependencies again
+    alienScope.provideClass(A, 'hello Chulak', false, () => {});
+    alienScope.provideClass(DependsOnA, A, []);
+    alienScope.provideClass(User, "Teal'c", DependsOnA);
+
+    const jack = container.inject(User);
+    const daniel = scientistScope.inject(User);
+    const tealc = alienScope.inject(User);
+
+    // jack === daniel              => false
+    // jack === tealc               => false
+    // jack.name                    => Jack
+    // daniel.name                  => Daniel
+    // tealc.name                   => Teal'c
+    // jack.doa === daniel.doa      => true
+    // jack.doa === tealc.doa       => false
+    // jack.doa.a.text              => hello world
+    // daniel.doa.a.text            => hello world
+    // tealc.doa.a.text             => hello Chulak
+
+    expect(jack).not.toBe(daniel);
+    expect(jack).not.toBe(tealc);
+    expect(jack.name).toBe('Jack');
+    expect(daniel.name).toBe('Daniel');
+    expect(tealc.name).toBe("Teal'c");
+    expect(jack.doa).toBe(daniel.doa);
+    expect(jack.doa).not.toBe(tealc.doa);
+    expect(jack.doa.a.text).toBe('hello world');
+    expect(daniel.doa.a.text).toBe('hello world');
+    expect(tealc.doa.a.text).toBe('hello Chulak');
+  });
 });

@@ -13,14 +13,14 @@ import {
   type ErrorKind,
   type Identifier,
   type IdentifierDefinition,
-  type ResolveMode,
+  type InjectionMode,
   type Resolver
 } from './types.js';
 
 type InstanceCreator<T> = () => T;
 type ResolveFromScope = <T>(
   identifier_: Identifier<T>,
-  mode_: ResolveMode
+  mode_: InjectionMode
 ) => InstanceCreator<T> | undefined;
 
 type CreatorSource = {
@@ -70,7 +70,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     this,
     EventArgs<[Identifier, ErrorKind]>
   >;
-  private readonly _resolvedEventHandler: EventHandler<
+  private readonly _injectedEventHandler: EventHandler<
     this,
     InstanceEventArgs<unknown>
   >;
@@ -84,13 +84,13 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     this._creatorSource = new Map();
     this._resolverSource = new Map();
     this._errorEventHandler = new EventHandler();
-    this._resolvedEventHandler = new EventHandler();
+    this._injectedEventHandler = new EventHandler();
     this._createdEventHandler = new EventHandler();
     this._disposers.push(() => {
       this._creatorSource.clear();
       this._resolverSource.clear();
       this._errorEventHandler.dispose();
-      this._resolvedEventHandler.dispose();
+      this._injectedEventHandler.dispose();
       this._createdEventHandler.dispose();
     });
   }
@@ -108,15 +108,15 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
   }
 
   /**
-   * subscribe/unsubscribe to an event that is triggered when an instance is resolved
+   * subscribe/unsubscribe to an event that is triggered when an instance is injected
    *
    * @public
    * @readonly
    * @type {Event<this, InstanceEventArgs<unknown>>}
    * @since 1.0.0
    */
-  public get onResolved(): Event<this, InstanceEventArgs<unknown>> {
-    return this._resolvedEventHandler.event;
+  public get onInjected(): Event<this, InstanceEventArgs<unknown>> {
+    return this._injectedEventHandler.event;
   }
 
   /**
@@ -240,7 +240,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
   /**
    * Inject/Resolve an instance. Suitable definitions must be provided in advance via provide() or provideClass().
    *
-   * ResolveMode:
+   * InjectionMode:
    * - singleton: created instance will be cached and reused on further injections; dependencies/constructor-parameters are resolved in 'singleton' mode
    * - unique: creates a new instance each time; dependencies/constructor-parameters are resolved in 'singleton' mode
    * - deep-unique: creates a new instance each time; dependencies/constructor-parameters are resolved in 'deep-unique' mode and are therefore also unique
@@ -248,21 +248,21 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
    * @public
    * @template T
    * @param {Identifier<T>} identifier_ class or injection key
-   * @param {ResolveMode} [mode_='singleton'] default 'singleton'
+   * @param {InjectionMode} [mode_='singleton'] default 'singleton'
    * @returns {T}
    * @throws {Error} when no definition is provided
    * @since 1.0.0
    */
   public inject<T>(
     identifier_: Identifier<T>,
-    mode_: ResolveMode = 'singleton'
+    mode_: InjectionMode = 'singleton'
   ): T {
     this.validateDisposed(this);
     const creator = this.getInstanceCreator(identifier_, mode_);
 
     if (creator) {
       const instance = creator();
-      this._resolvedEventHandler.invoke(
+      this._injectedEventHandler.invoke(
         this,
         new InstanceEventArgs(identifier_, instance)
       );
@@ -273,7 +273,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     this.throwInstanceError(
       identifier_,
       this.inject.name,
-      `"${this.identifierName(identifier_)}" could not be resolved`,
+      `"${this.identifierName(identifier_)}" could not be injected`,
       'missing'
     );
   }
@@ -391,7 +391,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
 
   private getInstanceCreator<T>(
     identifier_: Identifier<T>,
-    mode_: ResolveMode
+    mode_: InjectionMode
   ): InstanceCreator<T> | undefined {
     switch (mode_) {
       case 'singleton':
@@ -415,7 +415,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
 
   private resolveCreator<T>(
     identifier_: Identifier<T>,
-    mode_: ResolveMode
+    mode_: InjectionMode
   ): InstanceCreator<T> | undefined {
     const resolver = this._resolverSource.get(identifier_);
 
@@ -438,7 +438,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
 
   private resolveParameters<C extends StandardConstructor>(
     parameters_: ConstructableParameters<C>,
-    mode_: ResolveMode
+    mode_: InjectionMode
   ): ConstructorParameters<C> {
     return parameters_.map((parameter_) => {
       return this.isIdentifier(parameter_)

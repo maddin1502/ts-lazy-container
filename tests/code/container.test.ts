@@ -48,7 +48,7 @@ describe(LazyContainer, () => {
     let resolvedCount = 0;
     let constructedCount = 0;
     container.onError.subscribe('error', () => errorCount++);
-    container.onResolved.subscribe('resolved', () => resolvedCount++);
+    container.onInjected.subscribe('resolved', () => resolvedCount++);
     container.onCreated.subscribe('constructed', () => constructedCount++);
 
     container.provideClass(A);
@@ -86,7 +86,7 @@ describe(LazyContainer, () => {
     let resolvedCount = 0;
     let constructedCount = 0;
     container.onError.subscribe('error', () => errorCount++);
-    container.onResolved.subscribe('resolved', () => resolvedCount++);
+    container.onInjected.subscribe('resolved', () => resolvedCount++);
     container.onCreated.subscribe('constructed', () => constructedCount++);
 
     container.provideClass(A);
@@ -115,7 +115,7 @@ describe(LazyContainer, () => {
     let resolvedCount = 0;
     let constructedCount = 0;
     container.onError.subscribe('error', () => errorCount++);
-    container.onResolved.subscribe('resolved', () => resolvedCount++);
+    container.onInjected.subscribe('resolved', () => resolvedCount++);
     container.onCreated.subscribe('constructed', () => constructedCount++);
 
     container.provideClass(DependsOnA, A);
@@ -151,7 +151,7 @@ describe(LazyContainer, () => {
     let resolvedCount = 0;
     let constructedCount = 0;
     container.onError.subscribe('error', () => errorCount++);
-    container.onResolved.subscribe('resolved', () => resolvedCount++);
+    container.onInjected.subscribe('resolved', () => resolvedCount++);
     container.onCreated.subscribe('constructed', () => constructedCount++);
 
     container.provideClass(B);
@@ -235,7 +235,7 @@ describe(LazyContainer, () => {
     let resolvedCount = 0;
     let constructedCount = 0;
     container.onError.subscribe('error', () => errorCount++);
-    container.onResolved.subscribe('resolved', () => resolvedCount++);
+    container.onInjected.subscribe('resolved', () => resolvedCount++);
     container.onCreated.subscribe('constructed', () => constructedCount++);
 
     expect(() =>
@@ -301,7 +301,7 @@ describe(LazyContainer, () => {
     expect(() => container.onError.subscribe('', () => {})).toThrow(
       'Instance is disposed!'
     );
-    expect(() => container.onResolved.subscribe('', () => {})).toThrow(
+    expect(() => container.onInjected.subscribe('', () => {})).toThrow(
       'Instance is disposed!'
     );
     expect(() => container.onCreated.subscribe('', () => {})).toThrow(
