@@ -32,12 +32,13 @@
     "container",
     "dependecy injection",
     "singleton",
+    "unique",
     "type safe",
     "no decorators",
     "lightweight",
     "scoped",
-    "class based definitions",
-    "resolve by type"
+    "type/interface support",
+    "injectionskey"
   ],
   "author": "maddin1502",
   "license": "MIT",

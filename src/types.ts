@@ -8,11 +8,11 @@ import type { InjectionKey } from './injectionKey.js';
 export type InjectionMode = 'singleton' | 'unique' | 'deep-unique';
 export type ErrorKind = 'duplicate' | 'missing';
 export type Identifier<T = unknown> = StandardConstructor<T> | InjectionKey<T>;
-export type Definition<T> = Identifier<T> | Resolver<T>;
-export type IdentifierDefinition<I extends Identifier> = I extends Identifier<
+export type Instruction<T> = Identifier<T> | Resolver<T>;
+export type IdentifierInstruction<I extends Identifier> = I extends Identifier<
   infer T
 >
-  ? Definition<T>
+  ? Instruction<T>
   : never;
 
 export type Resolver<T = unknown> = (mode_: InjectionMode) => T;

@@ -12,7 +12,7 @@ import {
   type ConstructableParameters,
   type ErrorKind,
   type Identifier,
-  type IdentifierDefinition,
+  type IdentifierInstruction,
   type InjectionMode,
   type Resolver
 } from './types.js';
@@ -51,7 +51,7 @@ type ResolverSource = {
 
 /**
  * This tool manages the creation and distribution of application-wide instances.
- * These are created as singletons or unique variants as needed from provided definitions.
+ * These are created as singletons or unique variants as needed from provided instructions.
  * In addition, scopes can be used to refine the distribution
  *
  * @export
@@ -132,12 +132,12 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
   }
 
   /**
-   * Register an instance creation definition via its class definition.
+   * Register an instance creation instruction via its class definition.
    *
    * Required parameters are determined via the class constructor and must be specified in the correct order.
    * Simple parameters (primitive values, arrays, functions) can be passed directly.
    * Object-like parameters (interfaces, record types, anonymous objects) must be provided via a matching identifier (class or injection key - NOT an instance).
-   * These parameter identifiers are resolved internally; this is only possible if their instance creation definitions are also specified by provide() of provideClass().
+   * These parameter identifiers are resolved internally; this is only possible if their instance creation instructions are also specified via provide() of provideClass().
    *
    * ```ts
    * import { LazyContainer } from 'ts-lazy-container'
@@ -179,12 +179,12 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
   }
 
   /**
-   * Provide/Register instance creation definitions for a specific type (determined by the identifier - class or injection key).
+   * Provide/Register instance creation instructions for a specific type (determined by the identifier - class or injection key).
    *
    * Use cases:
-   * - custom definitions for class instances
-   * - provide types/interfaces/class definitions based on inheritance/duck-typing (resolve A with B, when B extends/inherits/satisfies A)
-   * - type/interface-based definition (no need for classes) using typed injection keys
+   * - custom instructions for class instances
+   * - provide types/interfaces/class instructions based on inheritance/duck-typing (resolve A with B, when B extends/inherits/satisfies A)
+   * - type/interface-based instruction (no need for classes) using typed injection keys
    *
    * ```ts
    * import { LazyContainer, injectionKey } from 'ts-lazy-container'
@@ -218,27 +218,27 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
    * @public
    * @template {Identifier} I
    * @param {I} identifier_ Identifier (class or injection key) that refers to the type to be provided/registered
-   * @param {IdentifierDefinition<I>} definition_ definition_  Definition: Identifier (class or injection key) that refers to a type that is assignable to the target type; or an instance creation callback
+   * @param {IdentifierInstruction<I>} instruction_  Identifier that refers to a type that is assignable to the target type OR an instance creation callback
    * @throws {Error} when already provided (duplicate)
    * @since 1.0.0
    */
   public provide<I extends Identifier>(
     identifier_: I,
-    definition_: IdentifierDefinition<I>
+    instruction_: IdentifierInstruction<I>
   ): void {
     this.validateDisposed(this);
     this.validateKnown(identifier_);
 
     this.setResolver(
       identifier_,
-      this.isIdentifier(definition_)
-        ? (mode_) => this.inject(definition_, mode_)
-        : definition_
+      this.isIdentifier(instruction_)
+        ? (mode_) => this.inject(instruction_, mode_)
+        : instruction_
     );
   }
 
   /**
-   * Inject/Resolve an instance. Suitable definitions must be provided in advance via provide() or provideClass().
+   * Inject/Resolve an instance. Suitable instructions must be provided in advance via provide() or provideClass().
    *
    * InjectionMode:
    * - singleton: created instance will be cached and reused on further injections; dependencies/constructor-parameters are resolved in 'singleton' mode
@@ -250,7 +250,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
    * @param {Identifier<T>} identifier_ class or injection key
    * @param {InjectionMode} [mode_='singleton'] default 'singleton'
    * @returns {T}
-   * @throws {Error} when no definition is provided
+   * @throws {Error} when no instruction found
    * @since 1.0.0
    */
   public inject<T>(
@@ -322,7 +322,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
   }
 
   /**
-   * Pre-resolve all instances as singletons using the provided definitions (abandon laziness; including scopes).
+   * Pre-resolve all instances as singletons using the provided instructions (abandon laziness; including scopes).
    *
    * HINT: can be used to validate container consistency in tests
    *

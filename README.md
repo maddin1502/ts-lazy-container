@@ -1,5 +1,5 @@
 # ts-lazy-container
-> This tool manages the creation and distribution of application-wide instances. These are created as singletons or unique variants as needed from provided definitions. In addition, scopes can be used to refine the distribution
+> This tool manages the creation and distribution of application-wide instances. These are created as singletons or unique variants as needed from provided instructions. In addition, scopes can be used to refine the distribution
 
 [![npm version](https://badge.fury.io/js/ts-lazy-container.svg)](https://badge.fury.io/js/ts-lazy-container)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -7,12 +7,12 @@
 
 ## Features
 - global dependency injection
-- lazy instance resolution/injection (create instances on demand)
+- lazy instance injection (create instances on demand)
 - class based provisioning/registration
 - injection key for type/interface based provisioning/registration
-- singleton or unique instance resolution/injection
-- refined distribution by isolated and inherited scopes (custom, flexible, fine-grained, encapsulated instance resolution/injection)
-- auto dependecy resolution (use provided/registered definitions to resolve object based class contructor parameters)
+- singleton or unique instance injection
+- refined distribution by isolated and inherited scopes (custom, flexible, fine-grained, encapsulated instance injection)
+- auto dependecy resolution (use provided/registered instructions to resolve object based class contructor parameters)
 
 ## Installation
 ```bash
@@ -25,9 +25,9 @@ LazyContainer is lazy by design (as the name suggests). Instances will be create
 
 ### Injection Modes
 
-- singleton: created instance will be cached and reused on further injections. Dependencies (e.g. constructor parameters) are resolved in 'singleton' mode, too
-- unique: creates a unique instance on each injection. Dependencies (e.g. constructor parameters) are resolved in 'singleton' mode and are therefore NOT unique
-- deep-unique: creates a unique instance on each injection. Dependencies (e.g. constructor parameters) are resolved in 'deep-unique' mode and are therefore also unique
+- `singleton`: created instance will be cached and reused on further injections. Dependencies (e.g. constructor parameters) are resolved in 'singleton' mode, too
+- `unique`: creates a unique instance on each injection. Dependencies (e.g. constructor parameters) are resolved in 'singleton' mode and are therefore NOT unique
+- `deep-unique`: creates a unique instance on each injection. Dependencies (e.g. constructor parameters) are resolved in 'deep-unique' mode and are therefore also unique
 
 ### Register creation instructions
 
@@ -42,15 +42,12 @@ Use `provide()` and/or `provideClass()` to register creation instructions.
 ### Scoping
 
 Scopes allow you to create tree structures within containers. This makes it possible to inject unique instances for specific use cases. These scopes can be created isolated or inherited. A scope is also just a container, so a scope can be created within a scope (and so on...).
-- isolated: An isolated scope
-
-TODO:
-inherited
-isolated
+- inherited: An inherited scope can resolve instances from its parent. So when the scope tries to inject/resolve an instance (and its dependencies), it first looks for a provided instrution in the scope itself. If none is found, it tries to load it from the parent.
+- isolated: An isolated scope cannot access its parent. Therefore, it cannot access its registed instruction and all required instructions must be provided in the scope itself
 
 ### Application Examples
 
-Example types and classes for all example variants
+Types and classes for all example variants
 
 ```ts
 type TypedA = {
@@ -237,6 +234,8 @@ const alienScope = container.scope('alien').isolated; // NO access to parent; ne
 alienScope.provideClass(A, 'hello Chulak', false, () => {});
 alienScope.provideClass(DependsOnA, A, []);
 alienScope.provideClass(User, "Teal'c", DependsOnA);
+
+// ...
 
 const jack = container.inject(User);
 const daniel = scientistScope.inject(User);
