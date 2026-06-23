@@ -137,7 +137,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
    * Required parameters are determined via the class constructor and must be specified in the correct order.
    * Simple parameters (primitive values, arrays, functions) can be passed directly.
    * Object-like parameters (interfaces, record types, anonymous objects) must be provided via a matching identifier (class or injection key - NOT an instance).
-   * These parameter identifiers are resolved internally; this is only possible if their instance creation instructions are also specified via provide() of provideClass().
+   * These parameter identifiers are resolved internally; this is only possible if their instance creation instructions are also specified via provide() or provideClass().
    *
    * ```ts
    * import { LazyContainer } from 'ts-lazy-container'
@@ -151,8 +151,8 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
    * }
    *
    * const container = LazyContainer.Create();
-   * container.provide(A)
-   * container.provide(B, A, 'hello world')
+   * container.provideClass(A)
+   * container.provideClass(B, A, 'hello world')
    *
    * ...
    *
@@ -204,15 +204,15 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
    * const aInjectionKey2 = injectionKey<AType>();
    * container.provide(aInjectionKey, () => ({value: 'hi'}))
    * container.provide(A1, () => new A1('hello'))
-   * container.provide(A2, 'greetings')
+   * container.provideClass(A2, 'greetings')
    * container.provide(aInjectionKey2, A2)
    *
    * ...
    *
    * const aik: AType = container.inject(aInjectionKey); // value = hi
    * const a1: AType = container.inject(A1); // value = hello
-   * const a2: AType = container.inject(A2); // value = greeting
-   * const aik2: AType = container.inject(aInjectionKey2); // value = greeting
+   * const a2: AType = container.inject(A2); // value = greetings
+   * const aik2: AType = container.inject(aInjectionKey2); // value = greetings
    * ```
    *
    * @public

@@ -16,7 +16,7 @@ export class LazyContainerScope
   }
 
   /**
-   * get an inherited scope that is able to access it's parent
+   * get an inherited scope that is able to access its parent
    *
    * @public
    * @readonly
