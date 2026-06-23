@@ -393,6 +393,23 @@ describe(LazyContainer, () => {
     expect(singletonAfter).not.toBe(unique);
   });
 
+  it('regular function resolver is not mistaken for an identifier', () => {
+    expect.assertions(2);
+    const container = LazyContainer.Create();
+
+    // a non-arrow function instruction must be treated as a resolver callback,
+    // not as a (class) identifier to delegate to
+    container.provide(A, function () {
+      const a = new A();
+      a.something = 'from function resolver';
+      return a;
+    });
+
+    const a = container.inject(A);
+    expect(a).toBeInstanceOf(A);
+    expect(a.something).toBe('from function resolver');
+  });
+
   it('circular dependency detection', () => {
     expect.assertions(4);
     const container = LazyContainer.Create();

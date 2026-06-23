@@ -485,9 +485,18 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
   }
 
   private isConstructor(value_: unknown): value_ is StandardConstructor {
-    return (
-      typeof value_ === 'function' && value_.toString().startsWith('class')
+    if (typeof value_ !== 'function') {
+      return false;
+    }
+
+    // a class exposes a non-writable `prototype` descriptor; regular functions
+    // (resolver callbacks) have a writable one and arrow functions have none
+    const prototypeDescriptor = Object.getOwnPropertyDescriptor(
+      value_,
+      'prototype'
     );
+
+    return prototypeDescriptor !== undefined && !prototypeDescriptor.writable;
   }
 
   private isIdentifier(value_: unknown): value_ is Identifier {

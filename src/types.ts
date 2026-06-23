@@ -33,12 +33,4 @@ type ConstructableValue<CPV> = CPV extends MethodLike
   ? Identifier<CPV>
   : CPV;
 
-export type ProvisioningParameters<I extends Identifier> = I extends Identifier<
-  infer T
->
-  ? I extends StandardConstructor
-    ? ConstructableParameters<I>
-    : [StandardConstructor<T>]
-  : never;
-
 export class InstanceEventArgs<T> extends EventArgs<[Identifier<T>, T]> {}
