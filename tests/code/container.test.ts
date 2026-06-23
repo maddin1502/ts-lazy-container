@@ -377,4 +377,19 @@ describe(LazyContainer, () => {
     expect(c0DoA).not.toBe(c0s0DoAdu2);
     expect(c0s0DoAdu1.a).not.toBe(c0s0DoAdu2.a);
   });
+
+  it('unique injection must not pollute singleton cache', () => {
+    expect.assertions(3);
+    const container = LazyContainer.Create();
+
+    container.provideClass(A);
+
+    const singletonBefore = container.inject(A);
+    const unique = container.inject(A, 'unique');
+    const singletonAfter = container.inject(A, 'singleton');
+
+    expect(unique).not.toBe(singletonBefore);
+    expect(singletonAfter).toBe(singletonBefore);
+    expect(singletonAfter).not.toBe(unique);
+  });
 });

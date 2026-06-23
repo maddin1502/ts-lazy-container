@@ -397,17 +397,17 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
       case 'singleton':
         return (
           this._creatorSource.get(identifier_) ??
-          this.resolveCreator(identifier_, mode_) ??
+          this.resolveCreator(identifier_, mode_, true) ??
           this._resolveFromScope?.(identifier_, mode_)
         );
       case 'unique':
         return (
-          this.resolveCreator(identifier_, 'singleton') ??
-          this._resolveFromScope?.(identifier_, 'singleton')
+          this.resolveCreator(identifier_, 'singleton', false) ??
+          this._resolveFromScope?.(identifier_, 'unique')
         );
       case 'deep-unique':
         return (
-          this.resolveCreator(identifier_, mode_) ??
+          this.resolveCreator(identifier_, mode_, false) ??
           this._resolveFromScope?.(identifier_, mode_)
         );
     }
@@ -415,7 +415,8 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
 
   private resolveCreator<T>(
     identifier_: Identifier<T>,
-    mode_: InjectionMode
+    mode_: InjectionMode,
+    cache_: boolean
   ): InstanceCreator<T> | undefined {
     const resolver = this._resolverSource.get(identifier_);
 
@@ -428,7 +429,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
 
       const creator: InstanceCreator<T> = () => instance;
 
-      if (mode_ === 'singleton') {
+      if (cache_) {
         this._creatorSource.set<T>(identifier_, creator);
       }
 
