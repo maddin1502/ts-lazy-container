@@ -392,4 +392,27 @@ describe(LazyContainer, () => {
     expect(singletonAfter).toBe(singletonBefore);
     expect(singletonAfter).not.toBe(unique);
   });
+
+  it('circular dependency detection', () => {
+    expect.assertions(4);
+    const container = LazyContainer.Create();
+
+    class Chicken {
+      constructor(public egg: Egg) {}
+    }
+    class Egg {
+      constructor(public chicken: Chicken) {}
+    }
+
+    let errorCount = 0;
+    container.onError.subscribe('error', () => errorCount++);
+
+    container.provideClass(Chicken, Egg);
+    container.provideClass(Egg, Chicken);
+
+    expect(() => container.inject(Chicken)).toThrow(/circular dependency/);
+    expect(errorCount).toBe(1);
+    expect(() => container.inject(Egg)).toThrow(/circular dependency/);
+    expect(errorCount).toBe(2);
+  });
 });

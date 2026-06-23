@@ -66,6 +66,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
 
   private readonly _creatorSource: CreatorSource;
   private readonly _resolverSource: ResolverSource;
+  private readonly _resolving: Set<Identifier>;
   private readonly _errorEventHandler: EventHandler<
     this,
     EventArgs<[Identifier, ErrorKind]>
@@ -83,12 +84,14 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     super();
     this._creatorSource = new Map();
     this._resolverSource = new Map();
+    this._resolving = new Set();
     this._errorEventHandler = new EventHandler();
     this._injectedEventHandler = new EventHandler();
     this._createdEventHandler = new EventHandler();
     this._disposers.push(() => {
       this._creatorSource.clear();
       this._resolverSource.clear();
+      this._resolving.clear();
       this._errorEventHandler.dispose();
       this._injectedEventHandler.dispose();
       this._createdEventHandler.dispose();
@@ -421,7 +424,26 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     const resolver = this._resolverSource.get(identifier_);
 
     if (resolver) {
-      const instance = resolver(mode_);
+      if (this._resolving.has(identifier_)) {
+        this.throwInstanceError(
+          identifier_,
+          this.resolveCreator.name,
+          `circular dependency detected while resolving "${this.identifierName(
+            identifier_
+          )}"`,
+          'cyclic'
+        );
+      }
+
+      this._resolving.add(identifier_);
+      let instance: T;
+
+      try {
+        instance = resolver(mode_);
+      } finally {
+        this._resolving.delete(identifier_);
+      }
+
       this._createdEventHandler.invoke(
         this,
         new InstanceEventArgs(identifier_, instance)
