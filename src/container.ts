@@ -135,113 +135,68 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
   }
 
   /**
-   * Register an instance creation instruction via its class definition.
+   * Provide/Register an instance creation instruction for an identifier (class or injection key).
    *
-   * Required parameters are determined via the class constructor and must be specified in the correct order.
-   * Simple parameters (primitive values, arrays, functions) can be passed directly.
-   * Object-like parameters (interfaces, record types, anonymous objects) must be provided via a matching identifier (class or injection key - NOT an instance).
-   * These parameter identifiers are resolved internally; this is only possible if their instance creation instructions are also specified via provide() or provideClass().
+   * The form is determined automatically from the arguments:
+   * - construction: pass a class together with its constructor parameters.
+   *   Simple parameters (primitives, arrays, functions) are passed directly;
+   *   object-like parameters (interfaces, record types, anonymous objects) must
+   *   be passed as a matching identifier (class or injection key - NOT an
+   *   instance) and are resolved lazily on injection.
+   * - creation callback: pass a single function `(mode) => instance`.
+   * - delegation: pass a single identifier that resolves to an assignable type
+   *   (inheritance/duck-typing; e.g. resolve an injection key via a class).
    *
-   * ```ts
-   * import { LazyContainer } from 'ts-lazy-container'
+   * Note: a single function argument is always interpreted as a creation
+   * callback, and a single identifier argument for a *class* is always
+   * interpreted as that class' sole constructor parameter.
    *
-   * class A {}
-   * class B {
-   *   constructor(
-   *     public a: A,
-   *     public text: string
-   *   ) {}
-   * }
-   *
-   * const container = LazyContainer.Create();
-   * container.provideClass(A)
-   * container.provideClass(B, A, 'hello world')
-   *
-   * ...
-   *
-   * const b = container.inject(B);
-   * ```
-   *
-   * @public
-   * @template {StandardConstructor} C
-   * @param {C} constructor_ Class itself, NOT an instance
-   * @param {...ConstructableParameters<C>} parameters_
-   * @throws {Error} when already provided (duplicate)
-   * @since 1.0.0
-   */
-  public provideClass<C extends StandardConstructor>(
-    constructor_: C,
-    ...parameters_: ConstructableParameters<C>
-  ): void {
-    this.validateDisposed(this);
-    this.validateKnown(constructor_);
-    this.setResolver(
-      constructor_,
-      (mode_) => new constructor_(...this.resolveParameters(parameters_, mode_))
-    );
-  }
-
-  /**
-   * Provide/Register instance creation instructions for a specific type (determined by the identifier - class or injection key).
-   *
-   * Use cases:
-   * - custom instructions for class instances
-   * - provide types/interfaces/class instructions based on inheritance/duck-typing (resolve A with B, when B extends/inherits/satisfies A)
-   * - type/interface-based instruction (no need for classes) using typed injection keys
+   * Identifiers can only be registered once; duplicate registration throws.
    *
    * ```ts
    * import { LazyContainer, injectionKey } from 'ts-lazy-container'
    *
-   * type AType = {
-   *   value: string
-   * }
-   *
-   * class A1 implements AType {
-   *   constructor(public value: string) {}
-   * }
-   *
+   * type AType = { value: string }
+   * class A1 implements AType { constructor(public value: string) {} }
    * class A2 extends A1 {}
    *
    * const container = LazyContainer.Create();
    * const aInjectionKey = injectionKey<AType>();
    * const aInjectionKey2 = injectionKey<AType>();
-   * container.provide(aInjectionKey, () => ({value: 'hi'}))
-   * container.provide(A1, () => new A1('hello'))
-   * container.provideClass(A2, 'greetings')
-   * container.provide(aInjectionKey2, A2)
+   *
+   * container.provide(A1, () => new A1('hello'))           // creation callback
+   * container.provide(A2, 'greetings')                     // construction
+   * container.provide(aInjectionKey, () => ({ value: 'hi' })) // creation callback
+   * container.provide(aInjectionKey2, A2)                  // delegation
    *
    * ...
    *
-   * const aik: AType = container.inject(aInjectionKey); // value = hi
    * const a1: AType = container.inject(A1); // value = hello
    * const a2: AType = container.inject(A2); // value = greetings
+   * const aik: AType = container.inject(aInjectionKey); // value = hi
    * const aik2: AType = container.inject(aInjectionKey2); // value = greetings
    * ```
    *
    * @public
-   * @template {Identifier} I
-   * @param {I} identifier_ Identifier (class or injection key) that refers to the type to be provided/registered
-   * @param {IdentifierInstruction<I>} instruction_  Identifier that refers to a type that is assignable to the target type OR an instance creation callback
    * @throws {Error} when already provided (duplicate)
    * @since 1.0.0
    */
+  public provide<C extends StandardConstructor>(
+    constructor_: C,
+    ...parameters_: ConstructableParameters<C>
+  ): void;
   public provide<I extends Identifier>(
     identifier_: I,
     instruction_: IdentifierInstruction<I>
-  ): void {
+  ): void;
+  public provide(identifier_: Identifier, ...args_: unknown[]): void {
     this.validateDisposed(this);
     this.validateKnown(identifier_);
-
-    this.setResolver(
-      identifier_,
-      this.isIdentifier(instruction_)
-        ? (mode_) => this.inject(instruction_, mode_)
-        : instruction_
-    );
+    this.setResolver(identifier_, this.createResolver(identifier_, args_));
   }
 
   /**
-   * Inject/Resolve an instance. Suitable instructions must be provided in advance via provide() or provideClass().
+   * Inject/Resolve an instance. Suitable instructions must be provided in advance via provide().
    *
    * InjectionMode:
    * - singleton: created instance will be cached and reused on further injections; dependencies/constructor-parameters are resolved in 'singleton' mode
@@ -459,15 +414,48 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     }
   }
 
-  private resolveParameters<C extends StandardConstructor>(
-    parameters_: ConstructableParameters<C>,
+  private createResolver(
+    identifier_: Identifier,
+    args_: readonly unknown[]
+  ): Resolver {
+    const firstArg = args_[0];
+
+    // a lone function argument is a creation callback `(mode) => instance`
+    if (args_.length === 1 && this.isResolver(firstArg)) {
+      return firstArg;
+    }
+
+    // a class is constructed from the given constructor parameters
+    // (isConstructor narrows identifier_ - no unchecked assertion needed)
+    if (this.isConstructor(identifier_)) {
+      return (mode_) =>
+        new identifier_(...this.resolveParameters(args_, mode_));
+    }
+
+    // a non-class identifier delegates to another (inheritance/duck-typing)
+    if (this.isIdentifier(firstArg)) {
+      return (mode_) => this.inject(firstArg, mode_);
+    }
+
+    // defensive (unreachable via the typed API): a non-class identifier must be
+    // given a creation callback or a delegation identifier
+    this.throwInstanceError(
+      identifier_,
+      this.createResolver.name,
+      `"${this.identifierName(identifier_)}" was given no valid instruction`,
+      'missing'
+    );
+  }
+
+  private resolveParameters(
+    parameters_: readonly unknown[],
     mode_: InjectionMode
-  ): ConstructorParameters<C> {
+  ): unknown[] {
     return parameters_.map((parameter_) => {
       return this.isIdentifier(parameter_)
         ? this.inject(parameter_, mode_)
         : parameter_;
-    }) as ConstructorParameters<C>;
+    });
   }
 
   private throwInstanceError(
@@ -501,5 +489,9 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
 
   private isIdentifier(value_: unknown): value_ is Identifier {
     return this.isConstructor(value_) || isInjectionKey(value_);
+  }
+
+  private isResolver(value_: unknown): value_ is Resolver {
+    return typeof value_ === 'function' && !this.isConstructor(value_);
   }
 }

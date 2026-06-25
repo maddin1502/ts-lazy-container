@@ -33,9 +33,12 @@ LazyContainer is lazy by design (as the name suggests). Instances will be create
 
 > Identifier = `Class` or `InjectionKey`
 
-Use `provide()` and/or `provideClass()` to register creation instructions.
-- With `provide` it is possible to register any Type, Interface or Class by using an `InjectionKey` as `identifier`. You can also register Classes without an `InjectionKey`, just use the `Class` itself as `identifier`. You must specify an additional callback function that creates an instance (must match the identifier type).
-- `provideClass` is specialized in class based registrations, it determines required constructor parameters that must be provided as well. Object-based constructor parameters do not require concrete instances but must be configured via `identifiers`. The container automatically resolves these `identifiers` when `inject()` is used to gain an instance (lazy), so they must also be registered in the container via `provide` or `provideClass`.
+Use `provide()` to register creation instructions. It covers three forms, chosen automatically from the arguments:
+- **construction**: pass a `Class` together with its constructor parameters. Simple parameters (primitives, arrays, functions) are passed directly. Object-based parameters do not require concrete instances but must be configured via `identifiers` (a `Class` or `InjectionKey` - NOT an instance). The container resolves these `identifiers` automatically on `inject()` (lazy), so they must be registered as well.
+- **creation callback**: pass a single function `(mode) => instance` that creates the instance (must match the identifier type). Use this to register any Type or Interface via an `InjectionKey`, or to give a `Class` custom creation logic.
+- **delegation**: pass a single `identifier` that resolves to an assignable type (inheritance/duck-typing; e.g. resolve an `InjectionKey` via a `Class`).
+
+> Note: a single function argument is always treated as a creation callback, and a single `identifier` argument for a `Class` is always treated as that class' sole constructor parameter.
 
 > `Identifiers` can only be registered once. Duplicate registration will result in an error. If multiple instances of a type are needed, different `InjectionKeys` of the same type must be created.
 
@@ -71,14 +74,14 @@ class DependsOnA {
 
 #### Variant 1
 
-Register a class that depends on another (using `provideClass`)
+Register a class that depends on another (construction form of `provide`)
 
 ```ts
 import { LazyContainer } from 'ts-lazy-container';
 
 const container = LazyContainer.Create();
-container.provideClass(A, 'hello world', true, () => {});
-container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+container.provide(A, 'hello world', true, () => {});
+container.provide(DependsOnA, A, [1, 2, 3, 42]);
 
 // ...
 
@@ -90,13 +93,13 @@ const doa = container.inject(DependsOnA);
 
 #### Variant 2
 
-Mixed usage of `provide` and `provideClass` for class registration
+Mixed usage of the creation-callback and construction forms of `provide`
 
 ```ts
 import { LazyContainer } from 'ts-lazy-container';
 const container = LazyContainer.Create();
 container.provide(A, () => new A('hello world', true, () => {}));
-container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+container.provide(DependsOnA, A, [1, 2, 3, 42]);
 
 // ...
 
@@ -120,7 +123,7 @@ container.provide(
   aInjectionKey,
   () => new A('hello world', true, () => {})
 );
-container.provideClass(DependsOnA, aInjectionKey, [1, 2, 3, 42]);
+container.provide(DependsOnA, aInjectionKey, [1, 2, 3, 42]);
 
 // ...
 
@@ -145,7 +148,7 @@ container.provide(aInjectionKey, () => ({
   flag: true,
   callback: () => {}
 }));
-container.provideClass(DependsOnA, aInjectionKey, [1, 2, 3, 42]);
+container.provide(DependsOnA, aInjectionKey, [1, 2, 3, 42]);
 
 // ...
 
@@ -168,8 +171,8 @@ const doa1InjectionKey = injectionKey<DependsOnA>();
 const doa2InjectionKey = injectionKey<DependsOnA>();
 
 const container = LazyContainer.Create();
-container.provideClass(A, 'hello world', true, () => {});
-container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+container.provide(A, 'hello world', true, () => {});
+container.provide(DependsOnA, A, [1, 2, 3, 42]);
 container.provide(doa1InjectionKey, DependsOnA);
 container.provide(
   doa2InjectionKey,
@@ -192,8 +195,8 @@ Inject unique instances - use the correct mode
 import { LazyContainer } from 'ts-lazy-container';
 
 const container = LazyContainer.Create();
-container.provideClass(A, 'hello world', true, () => {});
-container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+container.provide(A, 'hello world', true, () => {});
+container.provide(DependsOnA, A, [1, 2, 3, 42]);
 
 // ...
 
@@ -223,17 +226,17 @@ class User {
 
 const container = LazyContainer.Create();
 
-container.provideClass(A, 'hello world', true, () => {});
-container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
-container.provideClass(User, 'Jack', DependsOnA);
+container.provide(A, 'hello world', true, () => {});
+container.provide(DependsOnA, A, [1, 2, 3, 42]);
+container.provide(User, 'Jack', DependsOnA);
 
 const scientistScope = container.scope('scientist').inherited; // can resolve any instance from parent scope
-scientistScope.provideClass(User, 'Daniel', DependsOnA);
+scientistScope.provide(User, 'Daniel', DependsOnA);
 
 const alienScope = container.scope('alien').isolated; // NO access to parent; need to register dependencies again
-alienScope.provideClass(A, 'hello Chulak', false, () => {});
-alienScope.provideClass(DependsOnA, A, []);
-alienScope.provideClass(User, "Teal'c", DependsOnA);
+alienScope.provide(A, 'hello Chulak', false, () => {});
+alienScope.provide(DependsOnA, A, []);
+alienScope.provide(User, "Teal'c", DependsOnA);
 
 // ...
 
