@@ -490,4 +490,101 @@ describe(LazyContainer, () => {
 
     expect(() => untyped.provide(key, 42)).toThrow(/no valid instruction/);
   });
+
+  it('has and tryInject', () => {
+    expect.assertions(6);
+    const container = LazyContainer.Create();
+    container.provide(A);
+
+    expect(container.has(A)).toBe(true);
+    expect(container.has(B)).toBe(false);
+    expect(container.tryInject(A)).toBeInstanceOf(A);
+    expect(container.tryInject(B)).toBeUndefined();
+
+    expect(container.scope('s').inherited.has(A)).toBe(true);
+    expect(container.scope('s').isolated.has(A)).toBe(false);
+  });
+
+  it('override replaces an instruction and disposes the old singleton', () => {
+    expect.assertions(5);
+    const container = LazyContainer.Create();
+    let disposed = 0;
+
+    class Svc {
+      constructor(public tag: string) {}
+      dispose() {
+        disposed++;
+      }
+    }
+
+    container.provide(Svc, 'real'); // construction overload
+    const first = container.inject(Svc);
+    expect(first.tag).toBe('real');
+
+    container.override(Svc, () => new Svc('fake'));
+    expect(disposed).toBe(1); // old cached singleton disposed
+    const second = container.inject(Svc);
+    expect(second).not.toBe(first);
+    expect(second.tag).toBe('fake');
+
+    expect(() => container.override(B)).not.toThrow(); // override when not yet registered
+  });
+
+  it('disposes created singletons (dispose / Symbol.dispose), ignores the rest', () => {
+    expect.assertions(3);
+    const container = LazyContainer.Create();
+    let disposeCalls = 0;
+
+    class Resource {
+      dispose() {
+        disposeCalls++;
+      }
+    }
+    class SymbolResource {
+      [Symbol.dispose]() {
+        disposeCalls++;
+      }
+    }
+
+    const symKey = injectionKey<SymbolResource>('sym');
+    const numKey = injectionKey<number>('num');
+    const nullKey = injectionKey<null>('null');
+
+    container.provide(Resource);
+    container.provide(symKey, () => new SymbolResource());
+    container.provide(A); // object without dispose
+    container.provide(numKey, () => 42); // primitive
+    container.provide(nullKey, () => null);
+
+    container.inject(Resource);
+    container.removeSingleton(Resource);
+    expect(disposeCalls).toBe(1);
+
+    container.inject(symKey);
+    container.inject(A);
+    container.inject(numKey);
+    container.inject(nullKey);
+    container.clearSingletons();
+    expect(disposeCalls).toBe(2);
+
+    const scoped = LazyContainer.Create();
+    let scopedDisposed = 0;
+    class R2 {
+      dispose() {
+        scopedDisposed++;
+      }
+    }
+    scoped.provide(R2);
+    scoped.inject(R2);
+    scoped.dispose();
+    expect(scopedDisposed).toBe(1);
+  });
+
+  it('container is disposable via Symbol.dispose', () => {
+    expect.assertions(2);
+    const container = LazyContainer.Create();
+    expect(container.isDisposed).toBe(false);
+    container[Symbol.dispose]();
+    expect(container.isDisposed).toBe(true);
+  });
 });

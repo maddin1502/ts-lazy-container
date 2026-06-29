@@ -18,10 +18,6 @@ import {
 } from './types.js';
 
 type InstanceCreator<T> = () => T;
-type ResolveFromScope = <T>(
-  identifier_: Identifier<T>,
-  mode_: InjectionMode
-) => InstanceCreator<T> | undefined;
 
 type CreatorSource = {
   has<T>(identifier_: Identifier<T>): boolean;
@@ -31,8 +27,7 @@ type CreatorSource = {
     creator_: InstanceCreator<T>
   ): CreatorSource;
   forEach(
-    callbackfn: <T>(creator_: InstanceCreator<T>, key_: Identifier<T>) => void,
-    thisArg?: unknown
+    callbackfn: <T>(creator_: InstanceCreator<T>, key_: Identifier<T>) => void
   ): void;
   clear(): void;
   delete<T>(identifier_: Identifier<T>): boolean;
@@ -42,13 +37,11 @@ type ResolverSource = {
   get<T>(identifier_: Identifier<T>): Resolver<T> | undefined;
   set<T>(identifier_: Identifier<T>, resolver_: Resolver<T>): ResolverSource;
   forEach(
-    callbackfn: <T>(resolver_: Resolver<T>, key_: Identifier<T>) => void,
-    thisArg?: unknown
+    callbackfn: <T>(resolver_: Resolver<T>, key_: Identifier<T>) => void
   ): void;
   clear(): void;
   delete<T>(identifier_: Identifier<T>): boolean;
 };
-
 /**
  * This tool manages the creation and distribution of application-wide instances.
  * These are created as singletons or unique variants as needed from provided instructions.
@@ -80,7 +73,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     InstanceEventArgs<unknown>
   >;
 
-  protected constructor(private readonly _resolveFromScope?: ResolveFromScope) {
+  protected constructor(private readonly _parent?: LazyContainer) {
     super();
     this._creatorSource = new Map();
     this._resolverSource = new Map();
@@ -89,6 +82,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     this._injectedEventHandler = new EventHandler();
     this._createdEventHandler = new EventHandler();
     this._disposers.push(() => {
+      this.disposeSingletonInstances();
       this._creatorSource.clear();
       this._resolverSource.clear();
       this._resolving.clear();
@@ -196,6 +190,28 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
   }
 
   /**
+   * Like provide(), but replaces an existing instruction instead of throwing.
+   * Any cached singleton for the identifier is removed (and disposed) first.
+   * Useful for mocking/overriding in tests.
+   *
+   * @public
+   * @since 1.0.0
+   */
+  public override<C extends StandardConstructor>(
+    constructor_: C,
+    ...parameters_: ConstructableParameters<C>
+  ): void;
+  public override<I extends Identifier>(
+    identifier_: I,
+    instruction_: IdentifierInstruction<I>
+  ): void;
+  public override(identifier_: Identifier, ...args_: unknown[]): void {
+    this.validateDisposed(this);
+    this.removeSingleton(identifier_);
+    this.setResolver(identifier_, this.createResolver(identifier_, args_));
+  }
+
+  /**
    * Inject/Resolve an instance. Suitable instructions must be provided in advance via provide().
    *
    * InjectionMode:
@@ -219,13 +235,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     const creator = this.getInstanceCreator(identifier_, mode_);
 
     if (creator) {
-      const instance = creator();
-      this._injectedEventHandler.invoke(
-        this,
-        new InstanceEventArgs(identifier_, instance)
-      );
-
-      return instance;
+      return this.handOut(identifier_, creator);
     }
 
     this.throwInstanceError(
@@ -237,7 +247,42 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
   }
 
   /**
-   * Clear cached singleton instance
+   * Like inject(), but returns undefined instead of throwing when no instruction is found.
+   *
+   * @public
+   * @template T
+   * @param {Identifier<T>} identifier_ class or injection key
+   * @param {InjectionMode} [mode_='singleton'] default 'singleton'
+   * @returns {T | undefined}
+   * @since 1.0.0
+   */
+  public tryInject<T>(
+    identifier_: Identifier<T>,
+    mode_: InjectionMode = 'singleton'
+  ): T | undefined {
+    this.validateDisposed(this);
+    const creator = this.getInstanceCreator(identifier_, mode_);
+    return creator ? this.handOut(identifier_, creator) : undefined;
+  }
+
+  /**
+   * Check whether an instruction is registered for the identifier (including inherited scopes).
+   *
+   * @public
+   * @param {Identifier} identifier_ class or injection key
+   * @returns {boolean}
+   * @since 1.0.0
+   */
+  public has(identifier_: Identifier): boolean {
+    this.validateDisposed(this);
+    return (
+      this._resolverSource.has(identifier_) ||
+      (this._parent?.has(identifier_) ?? false)
+    );
+  }
+
+  /**
+   * Clear cached singleton instance (disposing it if it is disposable)
    *
    * @public
    * @template {Identifier} ID
@@ -250,7 +295,12 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     includeScopes_: boolean = false
   ): void {
     this.validateDisposed(this);
-    this._creatorSource.delete(identifier_);
+    const creator = this._creatorSource.get(identifier_);
+
+    if (creator) {
+      this.tryDisposeInstance(creator());
+      this._creatorSource.delete(identifier_);
+    }
 
     if (!includeScopes_) {
       return;
@@ -262,7 +312,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
   }
 
   /**
-   * Clear ALL cached singleton instances
+   * Clear ALL cached singleton instances (disposing those that are disposable)
    *
    * @public
    * @param {boolean} [includeScopes_=false]
@@ -270,6 +320,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
    */
   public clearSingletons(includeScopes_: boolean = false): void {
     this.validateDisposed(this);
+    this.disposeSingletonInstances();
     this._creatorSource.clear();
 
     if (!includeScopes_) {
@@ -298,6 +349,10 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     this.forEachScopeInstance((instance_) => instance_.presolve());
   }
 
+  public [Symbol.dispose](): void {
+    this.dispose();
+  }
+
   protected disposeScope(scope_: LazyContainerScope): void {
     scope_.dispose();
   }
@@ -306,12 +361,7 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     return new LazyContainerScope(
       scopeId_,
       (variant_) =>
-        new LazyContainer(
-          variant_ === 'inherited'
-            ? (identifier_, mode_) =>
-                this.getInstanceCreator(identifier_, mode_)
-            : undefined
-        )
+        new LazyContainer(variant_ === 'inherited' ? this : undefined)
     );
   }
 
@@ -328,6 +378,41 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
     this.scopes.forEach((scope_) =>
       scope_.variants.forEach((instance_) => callbackFn_(instance_))
     );
+  }
+
+  private handOut<T>(
+    identifier_: Identifier<T>,
+    creator_: InstanceCreator<T>
+  ): T {
+    const instance = creator_();
+    this._injectedEventHandler.invoke(
+      this,
+      new InstanceEventArgs(identifier_, instance)
+    );
+    return instance;
+  }
+
+  private disposeSingletonInstances(): void {
+    this._creatorSource.forEach((creator_) =>
+      this.tryDisposeInstance(creator_())
+    );
+  }
+
+  private tryDisposeInstance(instance_: unknown): void {
+    if (typeof instance_ !== 'object' || instance_ === null) {
+      return;
+    }
+
+    const dispose_ =
+      'dispose' in instance_
+        ? instance_.dispose
+        : Symbol.dispose in instance_
+        ? instance_[Symbol.dispose]
+        : undefined;
+
+    if (typeof dispose_ === 'function') {
+      dispose_.call(instance_);
+    }
   }
 
   private validateKnown<ID extends Identifier>(identifier_: ID): void {
@@ -356,17 +441,17 @@ export class LazyContainer extends ScopedInstanceCore<LazyContainerScope> {
         return (
           this._creatorSource.get(identifier_) ??
           this.resolveCreator(identifier_, mode_, true) ??
-          this._resolveFromScope?.(identifier_, mode_)
+          this._parent?.getInstanceCreator(identifier_, mode_)
         );
       case 'unique':
         return (
           this.resolveCreator(identifier_, 'singleton', false) ??
-          this._resolveFromScope?.(identifier_, 'unique')
+          this._parent?.getInstanceCreator(identifier_, 'unique')
         );
       case 'deep-unique':
         return (
           this.resolveCreator(identifier_, mode_, false) ??
-          this._resolveFromScope?.(identifier_, mode_)
+          this._parent?.getInstanceCreator(identifier_, mode_)
         );
     }
   }

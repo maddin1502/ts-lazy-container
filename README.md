@@ -13,6 +13,7 @@
 - singleton or unique instance injection
 - refined distribution by isolated and inherited scopes (custom, flexible, fine-grained, encapsulated instance injection)
 - auto dependency resolution (use provided/registered instructions to resolve object based class constructor parameters)
+- lifecycle management (created singletons are disposed with the container)
 
 ## Installation
 ```bash
@@ -41,6 +42,37 @@ Use `provide()` to register creation instructions. It covers three forms, chosen
 > Note: a single function argument is always treated as a creation callback, and a single `identifier` argument for a `Class` is always treated as that class' sole constructor parameter.
 
 > `Identifiers` can only be registered once. Duplicate registration will result in an error. If multiple instances of a type are needed, different `InjectionKeys` of the same type must be created.
+
+### Resolving
+
+- `inject(identifier, mode?)`: resolve an instance; throws if no instruction is registered.
+- `tryInject(identifier, mode?)`: like `inject()`, but returns `undefined` instead of throwing.
+- `has(identifier)`: check whether an instruction is registered (including inherited scopes).
+
+```ts
+container.provide(A);
+container.has(A);          // true
+container.inject(A);       // A instance
+container.tryInject(B);    // undefined (not registered)
+```
+
+### Overriding
+
+`provide()` throws on duplicates. Use `override()` to replace an existing instruction (and drop/dispose its cached singleton) - handy for mocking in tests.
+
+```ts
+container.provide(Logger, () => new RealLogger());
+container.override(Logger, () => new FakeLogger());
+```
+
+### Disposal
+
+The container is disposable. `dispose()` (or `using` via `Symbol.dispose`) tears it down; `removeSingleton()`/`clearSingletons()` evict cached singletons. In every case, evicted/torn-down singletons that expose `dispose()` or `[Symbol.dispose]()` are disposed automatically. Only cached singletons created by the container are disposed (not `unique`/`deep-unique` instances).
+
+```ts
+using container = LazyContainer.Create();
+container.provide(Connection); // Connection#dispose() runs when the block ends
+```
 
 ### Scoping
 
