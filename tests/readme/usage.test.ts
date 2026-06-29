@@ -24,8 +24,8 @@ describe('usage_provide', () => {
     expect.assertions(1);
     const container = LazyContainer.Create();
 
-    container.provideClass(A, 'hello world', true, () => {});
-    container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+    container.provide(A, 'hello world', true, () => {});
+    container.provide(DependsOnA, A, [1, 2, 3, 42]);
 
     const a = container.inject(A);
     // => { text: 'hello world'; flag: true; callback: () => {} }
@@ -38,7 +38,7 @@ describe('usage_provide', () => {
     const container = LazyContainer.Create();
 
     container.provide(A, () => new A('hello world', true, () => {}));
-    container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+    container.provide(DependsOnA, A, [1, 2, 3, 42]);
 
     const a = container.inject(A);
     // => { text: 'hello world'; flag: true; callback: () => {} }
@@ -55,7 +55,7 @@ describe('usage_provide', () => {
       aInjectionKey,
       () => new A('hello world', true, () => {})
     );
-    container.provideClass(DependsOnA, aInjectionKey, [1, 2, 3, 42]);
+    container.provide(DependsOnA, aInjectionKey, [1, 2, 3, 42]);
 
     const a = container.inject(aInjectionKey); // a: TypedA
     // => { text: 'hello world'; flag: true; callback: () => {} }
@@ -73,7 +73,7 @@ describe('usage_provide', () => {
       flag: true,
       callback: () => {}
     }));
-    container.provideClass(DependsOnA, aInjectionKey, [1, 2, 3, 42]);
+    container.provide(DependsOnA, aInjectionKey, [1, 2, 3, 42]);
 
     const a = container.inject(aInjectionKey); // a: TypedA
     // => { text: 'hello world'; flag: true; callback: () => {} }
@@ -87,8 +87,8 @@ describe('usage_provide', () => {
 
     const doa1InjectionKey = injectionKey<DependsOnA>();
     const doa2InjectionKey = injectionKey<DependsOnA>();
-    container.provideClass(A, 'hello world', true, () => {});
-    container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+    container.provide(A, 'hello world', true, () => {});
+    container.provide(DependsOnA, A, [1, 2, 3, 42]);
     container.provide(doa1InjectionKey, DependsOnA);
     container.provide(
       doa2InjectionKey,
@@ -106,8 +106,8 @@ describe('usage_provide', () => {
     expect.assertions(6);
     const container = LazyContainer.Create();
 
-    container.provideClass(A, 'hello world', true, () => {});
-    container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
+    container.provide(A, 'hello world', true, () => {});
+    container.provide(DependsOnA, A, [1, 2, 3, 42]);
 
     const doa1 = container.inject(DependsOnA); // defaults to 'singleton'
     const doa2 = container.inject(DependsOnA, 'singleton');
@@ -137,17 +137,17 @@ describe('usage_provide', () => {
 
     const container = LazyContainer.Create();
 
-    container.provideClass(A, 'hello world', true, () => {});
-    container.provideClass(DependsOnA, A, [1, 2, 3, 42]);
-    container.provideClass(User, 'Jack', DependsOnA);
+    container.provide(A, 'hello world', true, () => {});
+    container.provide(DependsOnA, A, [1, 2, 3, 42]);
+    container.provide(User, 'Jack', DependsOnA);
 
     const scientistScope = container.scope('scientist').inherited; // can resolve any instance from parent scope
-    scientistScope.provideClass(User, 'Daniel', DependsOnA);
+    scientistScope.provide(User, 'Daniel', DependsOnA);
 
     const alienScope = container.scope('alien').isolated; // NO access to parent; need to register dependencies again
-    alienScope.provideClass(A, 'hello Chulak', false, () => {});
-    alienScope.provideClass(DependsOnA, A, []);
-    alienScope.provideClass(User, "Teal'c", DependsOnA);
+    alienScope.provide(A, 'hello Chulak', false, () => {});
+    alienScope.provide(DependsOnA, A, []);
+    alienScope.provide(User, "Teal'c", DependsOnA);
 
     const jack = container.inject(User);
     const daniel = scientistScope.inject(User);

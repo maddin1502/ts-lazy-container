@@ -22,7 +22,7 @@ export type InjectionKey<T = unknown> = {
 };
 
 /**
- * create a typed symbol/identifier to be used with provideKey()
+ * create a typed symbol/identifier to be used with provide()
  *
  * @export
  * @template T

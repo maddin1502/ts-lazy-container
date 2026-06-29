@@ -6,7 +6,7 @@ import {
 import type { InjectionKey } from './injectionKey.js';
 
 export type InjectionMode = 'singleton' | 'unique' | 'deep-unique';
-export type ErrorKind = 'duplicate' | 'missing';
+export type ErrorKind = 'duplicate' | 'missing' | 'cyclic';
 export type Identifier<T = unknown> = StandardConstructor<T> | InjectionKey<T>;
 export type Instruction<T> = Identifier<T> | Resolver<T>;
 export type IdentifierInstruction<I extends Identifier> = I extends Identifier<
@@ -32,13 +32,5 @@ type ConstructableValue<CPV> = CPV extends MethodLike
   : CPV extends object
   ? Identifier<CPV>
   : CPV;
-
-export type ProvisioningParameters<I extends Identifier> = I extends Identifier<
-  infer T
->
-  ? I extends StandardConstructor
-    ? ConstructableParameters<I>
-    : [StandardConstructor<T>]
-  : never;
 
 export class InstanceEventArgs<T> extends EventArgs<[Identifier<T>, T]> {}

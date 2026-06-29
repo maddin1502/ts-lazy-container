@@ -51,8 +51,8 @@ describe(LazyContainer, () => {
     container.onInjected.subscribe('resolved', () => resolvedCount++);
     container.onCreated.subscribe('constructed', () => constructedCount++);
 
-    container.provideClass(A);
-    expect(() => container.provideClass(A)).toThrow();
+    container.provide(A);
+    expect(() => container.provide(A)).toThrow();
     expect(() => container.provide(A, () => new A())).toThrow();
     container.inject(A).something = '42';
     expect(resolvedCount).toBe(1);
@@ -61,7 +61,7 @@ describe(LazyContainer, () => {
     expect(container.inject(A).something).toBe('42');
     expect(resolvedCount).toBe(2);
     expect(constructedCount).toBe(1);
-    container.provideClass(DependsOnA, A);
+    container.provide(DependsOnA, A);
     container.inject(DependsOnA).a.something = '24';
     expect(resolvedCount).toBe(4);
     expect(constructedCount).toBe(2);
@@ -70,10 +70,10 @@ describe(LazyContainer, () => {
     expect(resolvedCount).toBe(5);
     expect(constructedCount).toBe(2);
     expect(errorCount).toBe(3);
-    container.provideClass(WithSimpleParams, B, 42, [42, 42], () => 84);
+    container.provide(WithSimpleParams, B, 42, [42, 42], () => 84);
     expect(() => container.inject(WithSimpleParams)).toThrow();
     expect(errorCount).toBe(4);
-    container.provideClass(B);
+    container.provide(B);
     expect(container.inject(WithSimpleParams).valueParam).toBe(42);
     expect(resolvedCount).toBe(7);
     expect(constructedCount).toBe(4);
@@ -89,7 +89,7 @@ describe(LazyContainer, () => {
     container.onInjected.subscribe('resolved', () => resolvedCount++);
     container.onCreated.subscribe('constructed', () => constructedCount++);
 
-    container.provideClass(A);
+    container.provide(A);
     const ik = injectionKey<AT>('at key');
     container.provide(ik, A);
     expect(() => container.provide(ik, A)).toThrow();
@@ -101,7 +101,7 @@ describe(LazyContainer, () => {
     expect(container.inject(ik).something).toBe('42');
     expect(resolvedCount).toBe(3);
     expect(constructedCount).toBe(2);
-    container.provideClass(DependsOnA, ik);
+    container.provide(DependsOnA, ik);
     container.inject(DependsOnA).a.something = '24';
     expect(resolvedCount).toBe(5);
     expect(constructedCount).toBe(3);
@@ -118,12 +118,12 @@ describe(LazyContainer, () => {
     container.onInjected.subscribe('resolved', () => resolvedCount++);
     container.onCreated.subscribe('constructed', () => constructedCount++);
 
-    container.provideClass(DependsOnA, A);
+    container.provide(DependsOnA, A);
     expect(() => container.presolve()).toThrow();
     expect(resolvedCount).toBe(0);
     expect(constructedCount).toBe(0);
     expect(errorCount).toBe(1);
-    container.provideClass(A);
+    container.provide(A);
     container.presolve();
     expect(resolvedCount).toBe(3);
     expect(constructedCount).toBe(2);
@@ -132,12 +132,12 @@ describe(LazyContainer, () => {
     expect(resolvedCount).toBe(5);
     expect(constructedCount).toBe(2);
     expect(errorCount).toBe(1);
-    container.provideClass(WithSimpleParams, B, 42, [42, 42], () => 84);
+    container.provide(WithSimpleParams, B, 42, [42, 42], () => 84);
     expect(() => container.presolve()).toThrow();
     // expect(resolvedCount).toBe(2);
     expect(constructedCount).toBe(2);
     expect(errorCount).toBe(2);
-    container.provideClass(B);
+    container.provide(B);
     container.presolve();
     // expect(resolvedCount).toBe(4);
     expect(constructedCount).toBe(4);
@@ -154,21 +154,21 @@ describe(LazyContainer, () => {
     container.onInjected.subscribe('resolved', () => resolvedCount++);
     container.onCreated.subscribe('constructed', () => constructedCount++);
 
-    container.provideClass(B);
-    container.provideClass(WithSimpleParams, B, 42, [42, 42], () => 84);
+    container.provide(B);
+    container.provide(WithSimpleParams, B, 42, [42, 42], () => 84);
     expect(container.inject(WithSimpleParams).valueParam).toBe(42);
     expect(container.inject(WithSimpleParams).arrayParam).toEqual([42, 42]);
     expect(container.inject(WithSimpleParams).functionParam()).toBe(84);
     expect(() =>
       container.scope(1).isolated.inject(WithSimpleParams)
     ).toThrow();
-    container.scope(1).isolated.provideClass(B);
+    container.scope(1).isolated.provide(B);
     expect(() =>
       container.scope(1).isolated.inject(WithSimpleParams)
     ).toThrow();
     container
       .scope(1)
-      .isolated.provideClass(WithSimpleParams, B, 4242, [4242, 4242], () => 8484);
+      .isolated.provide(WithSimpleParams, B, 4242, [4242, 4242], () => 8484);
     expect(container.inject(WithSimpleParams).valueParam).toBe(42);
     expect(container.inject(WithSimpleParams).arrayParam).toEqual([42, 42]);
     expect(container.inject(WithSimpleParams).functionParam()).toBe(84);
@@ -185,14 +185,14 @@ describe(LazyContainer, () => {
     expect(() =>
       container.scope(1).isolated.scope(1).isolated.inject(WithSimpleParams)
     );
-    container.scope(1).isolated.scope(1).isolated.provideClass(B);
+    container.scope(1).isolated.scope(1).isolated.provide(B);
     expect(() =>
       container.scope(1).isolated.scope(1).isolated.inject(WithSimpleParams)
     );
     container
       .scope(1)
       .isolated.scope(1)
-      .isolated.provideClass(
+      .isolated.provide(
         WithSimpleParams,
         B,
         424242,
@@ -241,11 +241,11 @@ describe(LazyContainer, () => {
     expect(() =>
       container.scope(1).inherited.inject(WithSimpleParams)
     ).toThrow();
-    container.provideClass(B);
+    container.provide(B);
     expect(() =>
       container.scope(1).inherited.inject(WithSimpleParams)
     ).toThrow();
-    container.provideClass(WithSimpleParams, B, 42, [42, 42], () => 84);
+    container.provide(WithSimpleParams, B, 42, [42, 42], () => 84);
     const c0 = container.inject(WithSimpleParams);
     const c1 = container.scope(1).inherited.inject(WithSimpleParams);
     expect(c0).toBe(c1); // both got resolved from root container
@@ -255,7 +255,7 @@ describe(LazyContainer, () => {
     expect(c1.functionParam()).toBe(84);
     container
       .scope(1)
-      .inherited.provideClass(WithSimpleParams, B, 4242, [4242, 4242], () => 8484);
+      .inherited.provide(WithSimpleParams, B, 4242, [4242, 4242], () => 8484);
 
     const c0v2 = container.inject(WithSimpleParams);
     const c1v2 = container.scope(1).inherited.inject(WithSimpleParams);
@@ -265,7 +265,7 @@ describe(LazyContainer, () => {
     expect(c1v2.arrayParam).toEqual([4242, 4242]);
     expect(c1v2.functionParam()).toBe(8484);
 
-    container.scope(1).inherited.provideClass(B);
+    container.scope(1).inherited.provide(B);
 
     const c0v3 = container.inject(WithSimpleParams);
     const c1v3 = container.scope(1).inherited.inject(WithSimpleParams);
@@ -315,16 +315,16 @@ describe(LazyContainer, () => {
       'Instance is disposed!'
     );
     expect(() => container.presolve()).toThrow('Instance is disposed!');
-    expect(() => container.provideClass(A)).toThrow('Instance is disposed!');
+    expect(() => container.provide(A)).toThrow('Instance is disposed!');
     expect(() => container.inject(A)).toThrow('Instance is disposed!');
   });
 
   it('clearSingletons', () => {
     expect.assertions(6);
     const container = LazyContainer.Create();
-    container.provideClass(A);
-    container.scope(1).isolated.provideClass(A);
-    container.scope(1).inherited.provideClass(A);
+    container.provide(A);
+    container.scope(1).isolated.provide(A);
+    container.scope(1).inherited.provide(A);
     const c0A = container.inject(A);
     const c1IsoA = container.scope(1).isolated.inject(A);
     const c1InhA = container.scope(1).inherited.inject(A);
@@ -342,8 +342,8 @@ describe(LazyContainer, () => {
     expect.assertions(12);
     const container = LazyContainer.Create();
 
-    container.provideClass(A);
-    container.provideClass(DependsOnA, A);
+    container.provide(A);
+    container.provide(DependsOnA, A);
 
     const c0DoA = container.inject(DependsOnA);
     const c0DoAu = container.inject(DependsOnA, 'unique');
@@ -376,5 +376,215 @@ describe(LazyContainer, () => {
     expect(c0DoA).not.toBe(c0s0DoAdu1);
     expect(c0DoA).not.toBe(c0s0DoAdu2);
     expect(c0s0DoAdu1.a).not.toBe(c0s0DoAdu2.a);
+  });
+
+  it('unique injection must not pollute singleton cache', () => {
+    expect.assertions(3);
+    const container = LazyContainer.Create();
+
+    container.provide(A);
+
+    const singletonBefore = container.inject(A);
+    const unique = container.inject(A, 'unique');
+    const singletonAfter = container.inject(A, 'singleton');
+
+    expect(unique).not.toBe(singletonBefore);
+    expect(singletonAfter).toBe(singletonBefore);
+    expect(singletonAfter).not.toBe(unique);
+  });
+
+  it('regular function resolver is not mistaken for an identifier', () => {
+    expect.assertions(2);
+    const container = LazyContainer.Create();
+
+    // a non-arrow function instruction must be treated as a resolver callback,
+    // not as a (class) identifier to delegate to
+    container.provide(A, function () {
+      const a = new A();
+      a.something = 'from function resolver';
+      return a;
+    });
+
+    const a = container.inject(A);
+    expect(a).toBeInstanceOf(A);
+    expect(a.something).toBe('from function resolver');
+  });
+
+  it('provide unifies construction, creation callbacks and delegation', () => {
+    expect.assertions(6);
+    const container = LazyContainer.Create();
+
+    class Constructed {
+      constructor(public value: string) {}
+    }
+    class ViaCallback {
+      constructor(public value: string) {}
+    }
+
+    container.provide(A);
+    expect(container.inject(A)).toBeInstanceOf(A);
+
+    container.provide(DependsOnA, A);
+    expect(container.inject(DependsOnA).a).toBe(container.inject(A));
+
+    container.provide(Constructed, 'constructed');
+    expect(container.inject(Constructed).value).toBe('constructed');
+
+    container.provide(ViaCallback, () => new ViaCallback('callback'));
+    expect(container.inject(ViaCallback).value).toBe('callback');
+
+    const atKey = injectionKey<AT>('at');
+    container.provide(atKey, A);
+    expect(container.inject(atKey)).toBe(container.inject(A));
+
+    const atKey2 = injectionKey<AT>('at2');
+    container.provide(atKey2, () => ({ something: 'literal' }));
+    expect(container.inject(atKey2).something).toBe('literal');
+  });
+
+  it('circular dependency detection', () => {
+    expect.assertions(4);
+    const container = LazyContainer.Create();
+
+    class Chicken {
+      constructor(public egg: Egg) {}
+    }
+    class Egg {
+      constructor(public chicken: Chicken) {}
+    }
+
+    let errorCount = 0;
+    container.onError.subscribe('error', () => errorCount++);
+
+    container.provide(Chicken, Egg);
+    container.provide(Egg, Chicken);
+
+    expect(() => container.inject(Chicken)).toThrow(/circular dependency/);
+    expect(errorCount).toBe(1);
+    expect(() => container.inject(Egg)).toThrow(/circular dependency/);
+    expect(errorCount).toBe(2);
+  });
+
+  it('presolve cascades into scope instances', () => {
+    expect.assertions(2);
+    const container = LazyContainer.Create();
+    const scope = container.scope('s').inherited;
+
+    let scopeCreated = 0;
+    scope.onCreated.subscribe('created', () => scopeCreated++);
+    scope.provide(B);
+
+    container.presolve();
+    expect(scopeCreated).toBe(1);
+    expect(scope.inject(B)).toBeInstanceOf(B);
+  });
+
+  it('provide throws for a non-class identifier without a valid instruction', () => {
+    expect.assertions(1);
+    const container = LazyContainer.Create();
+    const key = injectionKey<number>('number');
+
+    const untyped = container as unknown as {
+      provide(identifier_: unknown, ...args_: unknown[]): void;
+    };
+
+    expect(() => untyped.provide(key, 42)).toThrow(/no valid instruction/);
+  });
+
+  it('has and tryInject', () => {
+    expect.assertions(6);
+    const container = LazyContainer.Create();
+    container.provide(A);
+
+    expect(container.has(A)).toBe(true);
+    expect(container.has(B)).toBe(false);
+    expect(container.tryInject(A)).toBeInstanceOf(A);
+    expect(container.tryInject(B)).toBeUndefined();
+
+    expect(container.scope('s').inherited.has(A)).toBe(true);
+    expect(container.scope('s').isolated.has(A)).toBe(false);
+  });
+
+  it('override replaces an instruction and disposes the old singleton', () => {
+    expect.assertions(5);
+    const container = LazyContainer.Create();
+    let disposed = 0;
+
+    class Svc {
+      constructor(public tag: string) {}
+      dispose() {
+        disposed++;
+      }
+    }
+
+    container.provide(Svc, 'real'); // construction overload
+    const first = container.inject(Svc);
+    expect(first.tag).toBe('real');
+
+    container.override(Svc, () => new Svc('fake'));
+    expect(disposed).toBe(1); // old cached singleton disposed
+    const second = container.inject(Svc);
+    expect(second).not.toBe(first);
+    expect(second.tag).toBe('fake');
+
+    expect(() => container.override(B)).not.toThrow(); // override when not yet registered
+  });
+
+  it('disposes created singletons (dispose / Symbol.dispose), ignores the rest', () => {
+    expect.assertions(3);
+    const container = LazyContainer.Create();
+    let disposeCalls = 0;
+
+    class Resource {
+      dispose() {
+        disposeCalls++;
+      }
+    }
+    class SymbolResource {
+      [Symbol.dispose]() {
+        disposeCalls++;
+      }
+    }
+
+    const symKey = injectionKey<SymbolResource>('sym');
+    const numKey = injectionKey<number>('num');
+    const nullKey = injectionKey<null>('null');
+
+    container.provide(Resource);
+    container.provide(symKey, () => new SymbolResource());
+    container.provide(A); // object without dispose
+    container.provide(numKey, () => 42); // primitive
+    container.provide(nullKey, () => null);
+
+    container.inject(Resource);
+    container.removeSingleton(Resource);
+    expect(disposeCalls).toBe(1);
+
+    container.inject(symKey);
+    container.inject(A);
+    container.inject(numKey);
+    container.inject(nullKey);
+    container.clearSingletons();
+    expect(disposeCalls).toBe(2);
+
+    const scoped = LazyContainer.Create();
+    let scopedDisposed = 0;
+    class R2 {
+      dispose() {
+        scopedDisposed++;
+      }
+    }
+    scoped.provide(R2);
+    scoped.inject(R2);
+    scoped.dispose();
+    expect(scopedDisposed).toBe(1);
+  });
+
+  it('container is disposable via Symbol.dispose', () => {
+    expect.assertions(2);
+    const container = LazyContainer.Create();
+    expect(container.isDisposed).toBe(false);
+    container[Symbol.dispose]();
+    expect(container.isDisposed).toBe(true);
   });
 });
